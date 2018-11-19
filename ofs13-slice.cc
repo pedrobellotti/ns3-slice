@@ -15,17 +15,21 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author: Luciano Chaves <luciano@lrc.ic.unicamp.br>
- *         Vitor M. Eichemberger <vitor.marge@gmail.com>
  *
- * Two hosts connected to a single OpenFlow switch.
  * The switch is managed by the default learning controller application.
  *
  *                       Learning Controller
  *                                |
  *                       +-----------------+
- *            Host 0 === | OpenFlow switch | === Host 1
+ *      Host group 0 === |     OpenFlow    | === Server group 0
+ *                       |                 |
+ *      Host group 1 === |      switch     | === Server group 1
  *                       +-----------------+
+ * 
+ * Links:
+ * Host group 0 -> Server group 0
+ * Host group 1 -> Server group 1
+ * 
  */
 
 #include <ns3/core-module.h>
@@ -40,9 +44,13 @@ using namespace ns3;
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 11;
+  uint16_t simTime = 10;
   bool verbose = false;
   bool trace = false;
+
+  uint16_t numberOfHosts = 10;
+  //uint16_t numberOfServers = 4;
+
 
   // Configure command line parameters
   CommandLine cmd;
@@ -68,9 +76,9 @@ main (int argc, char *argv[])
   // Enable checksum computations (required by OFSwitch13 module)
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue (true));
 
-  // Create two host nodes
+  // Create host nodes
   NodeContainer hosts;
-  hosts.Create (2);
+  hosts.Create (numberOfHosts);
 
   // Create the switch node
   Ptr<Node> switchNode = CreateObject<Node> ();
@@ -80,13 +88,21 @@ main (int argc, char *argv[])
   csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Mbps")));
   csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (2)));
 
-  NetDeviceContainer hostDevices;
+  NetDeviceContainer hostGroup0;
+  NetDeviceContainer hostGroup1;
   NetDeviceContainer switchPorts;
-  for (size_t i = 0; i < hosts.GetN (); i++)
+  for (size_t i = 0; i < hosts.GetN ()/2; i++)
     {
       NodeContainer pair (hosts.Get (i), switchNode);
       NetDeviceContainer link = csmaHelper.Install (pair);
-      hostDevices.Add (link.Get (0));
+      hostGroup0.Add (link.Get (0));
+      switchPorts.Add (link.Get (1));
+    }
+  for (size_t i = hosts.GetN ()/2; i < hosts.GetN (); i++)
+    {
+      NodeContainer pair (hosts.Get (i), switchNode);
+      NetDeviceContainer link = csmaHelper.Install (pair);
+      hostGroup1.Add (link.Get (0));
       switchPorts.Add (link.Get (1));
     }
 
@@ -105,14 +121,17 @@ main (int argc, char *argv[])
 
   // Set IPv4 host addresses
   Ipv4AddressHelper ipv4helpr;
-  Ipv4InterfaceContainer hostIpIfaces;
+  Ipv4InterfaceContainer hostIpIfacesGroup0;
+  Ipv4InterfaceContainer hostIpIfacesGroup1;
   ipv4helpr.SetBase ("10.1.1.0", "255.255.255.0");
-  hostIpIfaces = ipv4helpr.Assign (hostDevices);
+  hostIpIfacesGroup0 = ipv4helpr.Assign (hostGroup0);
+  ipv4helpr.SetBase ("10.1.2.0", "255.255.255.0");
+  hostIpIfacesGroup1 = ipv4helpr.Assign (hostGroup1);
 
   // Configure ping application between hosts
-  V4PingHelper pingHelper = V4PingHelper (hostIpIfaces.GetAddress (1));
+  V4PingHelper pingHelper = V4PingHelper (hostIpIfacesGroup0.GetAddress (1));
   pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-  ApplicationContainer pingApps = pingHelper.Install (hosts.Get (0));
+  ApplicationContainer pingApps = pingHelper.Install (hosts.Get (9));
   pingApps.Start (Seconds (1));
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
@@ -121,7 +140,8 @@ main (int argc, char *argv[])
       of13Helper->EnableOpenFlowPcap ("openflow");
       of13Helper->EnableDatapathStats ("switch-stats");
       csmaHelper.EnablePcap ("switch", switchPorts, true);
-      csmaHelper.EnablePcap ("host", hostDevices);
+      csmaHelper.EnablePcap ("host0", hostGroup0);
+      csmaHelper.EnablePcap ("host1", hostGroup1);
     }
 
   // Run the simulation
