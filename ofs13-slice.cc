@@ -40,7 +40,7 @@ using namespace ns3;
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 10;
+  uint16_t simTime = 11;
   bool verbose = false;
   bool trace = false;
 
