@@ -38,8 +38,16 @@
 #include <ns3/internet-module.h>
 #include <ns3/ofswitch13-module.h>
 #include <ns3/internet-apps-module.h>
+#include "ns3/applications-module.h"
 
 using namespace ns3;
+
+void regra (Ptr<OFSwitch13Controller> c){
+  c->DpctlExecute(1, "flow-mod cmd=add,table=0,prio=102 "
+                "in_port=2 apply:output=10");
+  c->DpctlExecute(1, "flow-mod cmd=add,table=0,prio=101 "
+                "in_port=10 apply:output=2");
+}
 
 int
 main (int argc, char *argv[])
@@ -105,14 +113,13 @@ main (int argc, char *argv[])
       hostGroup1.Add (link.Get (0));
       switchPorts.Add (link.Get (1));
     }
-
   // Create the controller node
   Ptr<Node> controllerNode = CreateObject<Node> ();
 
   // Configure the OpenFlow network domain
   Ptr<OFSwitch13InternalHelper> of13Helper = CreateObject<OFSwitch13InternalHelper> ();
-  of13Helper->InstallController (controllerNode);
-  of13Helper->InstallSwitch (switchNode, switchPorts);
+  Ptr<OFSwitch13Controller> controller = of13Helper->InstallController (controllerNode);
+  OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode, switchPorts);
   of13Helper->CreateOpenFlowChannels ();
 
   // Install the TCP/IP stack into hosts nodes
@@ -128,11 +135,28 @@ main (int argc, char *argv[])
   ipv4helpr.SetBase ("10.1.2.0", "255.255.255.0");
   hostIpIfacesGroup1 = ipv4helpr.Assign (hostGroup1);
 
-  // Configure ping application between hosts
+  BulkSendHelper clienteC1 ("ns3::TcpSocketFactory",
+                           InetSocketAddress (hostIpIfacesGroup0.GetAddress (1), 9));
+  clienteC1.SetAttribute ("MaxBytes", UintegerValue (0));
+  ApplicationContainer c1Apps = clienteC1.Install (hosts.Get (9));
+  c1Apps.Start (Seconds (2.0));
+  c1Apps.Stop (Seconds (10.0));
+
+  PacketSinkHelper sinkS1 ("ns3::TcpSocketFactory",
+                          InetSocketAddress (Ipv4Address::GetAny (), 9));
+  ApplicationContainer s1Apps = sinkS1.Install (hosts.Get (1));
+  s1Apps.Start (Seconds (1.0));
+  s1Apps.Stop (Seconds (10.0));
+
+
+  /*// Configure ping application between hosts
   V4PingHelper pingHelper = V4PingHelper (hostIpIfacesGroup0.GetAddress (1));
   pingHelper.SetAttribute ("Verbose", BooleanValue (true));
   ApplicationContainer pingApps = pingHelper.Install (hosts.Get (9));
-  pingApps.Start (Seconds (1));
+  pingApps.Start (Seconds (1));*/
+
+  Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
+  Simulator::Schedule (Seconds(0.9), &regra, controller);
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
   if (trace)
@@ -143,9 +167,11 @@ main (int argc, char *argv[])
       csmaHelper.EnablePcap ("host0", hostGroup0);
       csmaHelper.EnablePcap ("host1", hostGroup1);
     }
-
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
   Simulator::Destroy ();
+
+  Ptr<PacketSink> sink1 = DynamicCast<PacketSink> (s1Apps.Get (0));
+  std::cout << "(S1) Total Bytes Received: " << sink1->GetTotalRx () << std::endl;
 }
