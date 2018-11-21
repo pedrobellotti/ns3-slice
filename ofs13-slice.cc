@@ -99,6 +99,10 @@ main (int argc, char *argv[])
   NetDeviceContainer hostGroup0;
   NetDeviceContainer hostGroup1;
   NetDeviceContainer switchPorts;
+
+  /* Dividindo os dois grupos de Hosts
+  * Ainda não tentamos fazer com os servidores, somente conectar os dois grupos de host
+  */
   for (size_t i = 0; i < hosts.GetN ()/2; i++)
     {
       NodeContainer pair (hosts.Get (i), switchNode);
@@ -127,14 +131,16 @@ main (int argc, char *argv[])
   internet.Install (hosts);
 
   // Set IPv4 host addresses
+  // Divide os dois grupos em ips diferentes
   Ipv4AddressHelper ipv4helpr;
   Ipv4InterfaceContainer hostIpIfacesGroup0;
   Ipv4InterfaceContainer hostIpIfacesGroup1;
   ipv4helpr.SetBase ("10.1.1.0", "255.255.255.0");
   hostIpIfacesGroup0 = ipv4helpr.Assign (hostGroup0);
-  ipv4helpr.SetBase ("10.1.2.0", "255.255.255.0");
+  ipv4helpr.SetBase ("10.1.2.0", "255.255.255.0"); //Se comentar essa linha, funciona normalmente. Com ips diferentes não funciona
   hostIpIfacesGroup1 = ipv4helpr.Assign (hostGroup1);
 
+  // Aplicação bulk-send
   BulkSendHelper clienteC1 ("ns3::TcpSocketFactory",
                            InetSocketAddress (hostIpIfacesGroup0.GetAddress (1), 9));
   clienteC1.SetAttribute ("MaxBytes", UintegerValue (0));
@@ -148,6 +154,7 @@ main (int argc, char *argv[])
   s1Apps.Start (Seconds (1.0));
   s1Apps.Stop (Seconds (10.0));
 
+  // Aplicação ping (mesmo problema da bulk-send)
 
   /*// Configure ping application between hosts
   V4PingHelper pingHelper = V4PingHelper (hostIpIfacesGroup0.GetAddress (1));
@@ -155,8 +162,18 @@ main (int argc, char *argv[])
   ApplicationContainer pingApps = pingHelper.Install (hosts.Get (9));
   pingApps.Start (Seconds (1));*/
 
+  //Imprime as tabelas
   Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
+  //Adiciona as regras manualmente
   Simulator::Schedule (Seconds(0.9), &regra, controller);
+
+  /* Os comandos acima foram para testar o porque não estar funcionando
+      1- Com IPs diferentes, o controlador não adiciona nenhuma regra no switch
+      2- Com IPs iguais, adiciona a regra
+      3- Tentamos adicionar as mesmas regras manualmente no switch com IPs diferentes, mas mesmo assim não funcionou
+   */
+
+  Ipv4GlobalRoutingHelper::PopulateRoutingTables (); //Mesmo com esse comando não funcionou
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
   if (trace)
@@ -172,6 +189,7 @@ main (int argc, char *argv[])
   Simulator::Run ();
   Simulator::Destroy ();
 
+  //Resultados do bulk-send
   Ptr<PacketSink> sink1 = DynamicCast<PacketSink> (s1Apps.Get (0));
   std::cout << "(S1) Total Bytes Received: " << sink1->GetTotalRx () << std::endl;
 }
