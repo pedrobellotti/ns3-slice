@@ -45,7 +45,7 @@ using namespace ns3;
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 10;
+  uint16_t simTime = 30;
   bool verbose = false;
   bool trace = false;
 
@@ -81,15 +81,15 @@ main (int argc, char *argv[])
   Config::SetDefault ("ns3::CsmaChannel::FullDuplex", BooleanValue (true));
 
   // Create host nodes
-  NodeContainer hostGroup0;
-  hostGroup0.Create (numberOfHosts);
+  NodeContainer hostG0S1;
+  hostG0S1.Create (numberOfHosts);
 
-  NodeContainer hostGroup1;
-  hostGroup1.Create (numberOfHosts);
+  NodeContainer hostG1S1;
+  hostG1S1.Create (numberOfHosts);
 
-  //Roteadores
-  NodeContainer roteadores;
-  roteadores.Create(2);
+  //routersS1
+  NodeContainer routersS1;
+  routersS1.Create(2);
 
   // Create the switch node
   Ptr<Node> switchNode = CreateObject<Node> ();
@@ -99,46 +99,43 @@ main (int argc, char *argv[])
   csmaHelper.SetChannelAttribute ("DataRate", DataRateValue (DataRate ("100Mbps")));
   csmaHelper.SetChannelAttribute ("Delay", TimeValue (MilliSeconds (2)));
 
+  // Install the TCP/IP stack into hosts nodes
+  InternetStackHelper internet;
+  internet.Install (hostG0S1);
+  internet.Install (hostG1S1);
+  internet.Install (routersS1);
+
   NetDeviceContainer switchPorts;
-  NetDeviceContainer hostGroup0Devices;
-  NetDeviceContainer hostGroup1Devices;
-  NetDeviceContainer roteador0Devices;
-  NetDeviceContainer roteador1Devices;
+  NetDeviceContainer hostG0S1Devices;
+  NetDeviceContainer hostG1S1Devices;
+
+  Ipv4AddressHelper ipv4helpr;
+  Ipv4InterfaceContainer IpG0S1;
+  Ipv4InterfaceContainer IpG1S1;
   /* Dividindo os dois grupos de Hosts
   * Ainda não tentamos fazer com os servidores, somente conectar os dois grupos de host
   */
-  for (size_t i = 0; i < hostGroup0.GetN(); i++){
-    NetDeviceContainer temp = csmaHelper.Install(hostGroup0.Get(i), roteadores.Get(0));
-    hostGroup0Devices.Add(temp.Get(0));
-    roteador0Devices.Add(temp.Get(1));
+  ipv4helpr.SetBase ("10.1.1.0", "255.255.255.0");
+  for (size_t i = 0; i < hostG0S1.GetN(); i++){
+    NetDeviceContainer temp = csmaHelper.Install(hostG0S1.Get(i), routersS1.Get(0));
+    Ipv4InterfaceContainer iptemp = ipv4helpr.Assign (temp);
+    IpG0S1.Add(iptemp.Get(0));
+    hostG0S1Devices.Add(temp.Get(0));
+    ipv4helpr.NewNetwork();
   }
-  for (size_t i = 0; i < hostGroup1.GetN(); i++){
-    NetDeviceContainer temp = csmaHelper.Install(hostGroup1.Get(i), roteadores.Get(1));
-    hostGroup1Devices.Add(temp.Get(0));
-    roteador1Devices.Add(temp.Get(1));
+  ipv4helpr.SetBase ("10.2.1.0", "255.255.255.0");
+  for (size_t i = 0; i < hostG1S1.GetN(); i++){
+    NetDeviceContainer temp = csmaHelper.Install(hostG1S1.Get(i), routersS1.Get(1));
+    Ipv4InterfaceContainer iptemp = ipv4helpr.Assign (temp);
+    IpG1S1.Add(iptemp.Get(0));
+    hostG1S1Devices.Add(temp.Get(0));
+    ipv4helpr.NewNetwork();
   }
-
-  //Conexao entre os roteadores
+  ipv4helpr.SetBase ("10.3.1.0", "255.255.255.0");
+  //Conexao entre os routersS1
   NetDeviceContainer roteador01Devices;
-  roteador01Devices = csmaHelper.Install(roteadores.Get(0), roteadores.Get(1));
-
-  /*
-  * Conecta os roteadores no switch (não funciona)
-  */
-  /*NodeContainer pair (roteador0, switchNode);
-  NetDeviceContainer link = csmaHelper.Install(pair);
-  switchPorts.Add(link.Get(0));
-
-  NodeContainer pair1 (roteador1, switchNode);
-  NetDeviceContainer link1 = csmaHelper.Install(pair1);
-  switchPorts.Add(link1.Get(0));*/
-  
-  /*NodeContainer par;
-  NetDeviceContainer pairDevs;
-  par = NodeContainer (hostGroup0, hostGroup1);
-  pairDevs = csmaHelper.Install (par);
-  switchPorts.Add (pairDevs.Get (0));
-  switchPorts.Add (pairDevs.Get (1));*/
+  roteador01Devices = csmaHelper.Install(routersS1.Get(0), routersS1.Get(1));
+  ipv4helpr.Assign (roteador01Devices);
     
   // Create the controller node
   Ptr<Node> controllerNode = CreateObject<Node> ();
@@ -149,48 +146,34 @@ main (int argc, char *argv[])
   OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode, switchPorts);
   of13Helper->CreateOpenFlowChannels ();
 
-  // Install the TCP/IP stack into hosts nodes
-  InternetStackHelper internet;
-  internet.Install (hostGroup0);
-  internet.Install (hostGroup1);
-  internet.Install (roteadores);
-
-  // Set IPv4 host addresses
-  // Divide os dois grupos em ips diferentes
-  Ipv4AddressHelper ipv4helpr;
-  Ipv4InterfaceContainer hostIpIfacesGroup0;
-  Ipv4InterfaceContainer hostIpIfacesGroup1;
-  ipv4helpr.SetBase ("10.1.1.0", "255.255.255.0");
-  hostIpIfacesGroup0 = ipv4helpr.Assign (hostGroup0Devices);
-  ipv4helpr.Assign (roteador0Devices);
-  
-  ipv4helpr.SetBase ("10.1.2.0", "255.255.255.0");
-  hostIpIfacesGroup1 = ipv4helpr.Assign (hostGroup1Devices);
-  ipv4helpr.Assign (roteador1Devices);
-  
-  ipv4helpr.SetBase ("10.1.3.0", "255.255.255.0");
-  ipv4helpr.Assign (roteador01Devices);
-
-  // Aplicação bulk-send
-  /*BulkSendHelper clienteC1 ("ns3::TcpSocketFactory",
-                           InetSocketAddress (hostIpIfacesGroup0.GetAddress (1), 9));
-  clienteC1.SetAttribute ("MaxBytes", UintegerValue (0));
-  ApplicationContainer c1Apps = clienteC1.Install (hosts.Get (9));
-  c1Apps.Start (Seconds (2.0));
-  c1Apps.Stop (Seconds (10.0));
-
-  PacketSinkHelper sinkS1 ("ns3::TcpSocketFactory",
-                          InetSocketAddress (Ipv4Address::GetAny (), 9));
-  ApplicationContainer s1Apps = sinkS1.Install (hosts.Get (1));
-  s1Apps.Start (Seconds (1.0));
-  s1Apps.Stop (Seconds (10.0));*/
-
-
   // Configure ping application between hosts
-  V4PingHelper pingHelper = V4PingHelper (hostIpIfacesGroup0.GetAddress (0));
+  /*V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (0));
   pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-  ApplicationContainer pingApps = pingHelper.Install (hostGroup1.Get (0));
+  ApplicationContainer pingApps = pingHelper.Install (hostG1S1.Get (0));
   pingApps.Start (Seconds (1));
+  pingApps.Stop (Seconds (2));*/
+
+  //Ping entre todos os hosts
+  
+  for (int p = 0; p < numberOfHosts; p++){
+    V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (p));
+    pingHelper.SetAttribute ("Verbose", BooleanValue (true));
+    for (int t = 0; t < numberOfHosts; t++){
+      ApplicationContainer pingApps = pingHelper.Install (hostG1S1.Get (t));
+      pingApps.Start (Seconds (1));
+      pingApps.Stop (Seconds (2));
+    }
+  }
+
+  for (int p = 0; p < numberOfHosts; p++){
+    V4PingHelper pingHelper = V4PingHelper (IpG1S1.GetAddress (p));
+    pingHelper.SetAttribute ("Verbose", BooleanValue (true));
+    for (int t = 0; t < numberOfHosts; t++){
+      ApplicationContainer pingApps = pingHelper.Install (hostG0S1.Get (t));
+      pingApps.Start (Seconds (1));
+      pingApps.Stop (Seconds (2));
+    }
+  }
 
   //Imprime as tabelas
   //Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
@@ -204,16 +187,12 @@ main (int argc, char *argv[])
       //of13Helper->EnableOpenFlowPcap ("openflow");
       //of13Helper->EnableDatapathStats ("switch-stats");
       //csmaHelper.EnablePcap ("switch", switchPorts, true);
-      csmaHelper.EnablePcap ("host0", hostGroup0);
-      csmaHelper.EnablePcap ("host1", hostGroup1);
-      csmaHelper.EnablePcap ("roteadores", roteadores);
+      csmaHelper.EnablePcap ("host0", hostG0S1);
+      csmaHelper.EnablePcap ("host1", hostG1S1);
+      csmaHelper.EnablePcap ("routersS1", routersS1);
     }
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
   Simulator::Destroy ();
-
-  //Resultados do bulk-send
-  //Ptr<PacketSink> sink1 = DynamicCast<PacketSink> (s1Apps.Get (0));
-  //std::cout << "(S1) Total Bytes Received: " << sink1->GetTotalRx () << std::endl;
 }
