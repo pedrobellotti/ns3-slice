@@ -45,12 +45,11 @@ using namespace ns3;
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 30;
+  uint16_t simTime = 10;
   bool verbose = false;
   bool trace = false;
 
   uint16_t numberOfHosts = 2;
-  //uint16_t numberOfServers = 4;
 
   // Configure command line parameters
   CommandLine cmd;
@@ -73,7 +72,7 @@ main (int argc, char *argv[])
       LogComponentEnable ("OFSwitch13Helper", LOG_LEVEL_ALL);
       LogComponentEnable ("OFSwitch13InternalHelper", LOG_LEVEL_ALL);
     }
-
+  
   // Enable checksum computations (required by OFSwitch13 module)
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue (true));
 
@@ -140,11 +139,42 @@ main (int argc, char *argv[])
   // Create the controller node
   Ptr<Node> controllerNode = CreateObject<Node> ();
 
+  //Conectando roteadores no switch
+  /*NetDeviceContainer roteador01Devices;
+  for (size_t i = 0; i < routersS1.GetN (); i++)
+  {
+      NodeContainer pair (routersS1.Get (i), switchNode);
+      NetDeviceContainer link = csmaHelper.Install (pair);
+      //roteador01Devices.Add (link.Get (0));
+      switchPorts.Add (link.Get (1));
+  }*/
+
   // Configure the OpenFlow network domain
   Ptr<OFSwitch13InternalHelper> of13Helper = CreateObject<OFSwitch13InternalHelper> ();
   Ptr<OFSwitch13Controller> controller = of13Helper->InstallController (controllerNode);
   OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode, switchPorts);
   of13Helper->CreateOpenFlowChannels ();
+
+
+  //Aplicacoes http
+  //Group 0 = Clientes; Group 1 = Servidores
+  uint16_t httpServerPort = 80;
+  //Servidores
+  for (size_t i = 0; i < hostG1S1.GetN(); i++){
+    HttpServerHelper httpServer (httpServerPort);
+    ApplicationContainer httpServerApps;
+    httpServerApps.Add (httpServer.Install (hostG1S1.Get (i)));
+    httpServerApps.Start (Seconds(1.0));
+    httpServerApps.Stop (Seconds(10.0));
+  }
+  //Clientes
+  for (size_t i = 0; i < hostG0S1.GetN(); i++){
+    ApplicationContainer httpClientApps;
+    HttpClientHelper httpClient (IpG1S1.GetAddress (i), httpServerPort);
+    httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
+    httpClientApps.Start (Seconds(2.0));
+    httpClientApps.Stop (Seconds(10.0));
+  }
 
   // Configure ping application between hosts
   /*V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (0));
@@ -154,8 +184,7 @@ main (int argc, char *argv[])
   pingApps.Stop (Seconds (2));*/
 
   //Ping entre todos os hosts
-  
-  for (int p = 0; p < numberOfHosts; p++){
+  /*for (int p = 0; p < numberOfHosts; p++){
     V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (p));
     pingHelper.SetAttribute ("Verbose", BooleanValue (true));
     for (int t = 0; t < numberOfHosts; t++){
@@ -173,7 +202,7 @@ main (int argc, char *argv[])
       pingApps.Start (Seconds (1));
       pingApps.Stop (Seconds (2));
     }
-  }
+  }*/
 
   //Imprime as tabelas
   //Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
