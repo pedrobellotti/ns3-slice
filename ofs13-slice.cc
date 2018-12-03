@@ -42,6 +42,9 @@
 
 using namespace ns3;
 
+NS_LOG_COMPONENT_DEFINE ("SliceExample");
+
+
 int
 main (int argc, char *argv[])
 {
@@ -49,7 +52,7 @@ main (int argc, char *argv[])
   bool verbose = false;
   bool trace = false;
 
-  uint16_t numberOfHosts = 2;
+  uint16_t numberOfHosts = 5;
 
   // Configure command line parameters
   CommandLine cmd;
@@ -58,6 +61,10 @@ main (int argc, char *argv[])
   cmd.AddValue ("trace", "Enable datapath stats and pcap traces", trace);
   cmd.AddValue ("numberOfHosts", "Number of hosts", numberOfHosts);
   cmd.Parse (argc, argv);
+
+  LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
+  LogComponentEnable ("HttpClientApplication", LOG_LEVEL_INFO);
+  LogComponentEnable ("HttpServerApplication", LOG_LEVEL_INFO);
 
   if (verbose)
     {
