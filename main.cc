@@ -56,10 +56,10 @@ void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap){
   c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=1 in_port=4 goto:2");
 
 
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=1,prio=1 in_port=1 apply:output=2");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=1,prio=1 in_port=2 apply:output=1");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=2,prio=1 in_port=3 apply:output=4");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=2,prio=1 in_port=4 apply:output=3");
+  /*c->DpctlExecute (datap, "flow-mod cmd=add,table=1,prio=1 in_port=1 write:output=2");
+  c->DpctlExecute (datap, "flow-mod cmd=add,table=1,prio=1 in_port=2 write:output=1");
+  c->DpctlExecute (datap, "flow-mod cmd=add,table=2,prio=1 in_port=3 write:output=4");
+  c->DpctlExecute (datap, "flow-mod cmd=add,table=2,prio=1 in_port=4 write:output=3");*/
 }
 
 int
@@ -79,9 +79,9 @@ main (int argc, char *argv[])
   cmd.AddValue ("numberOfHosts", "Number of hosts", numberOfHosts);
   cmd.Parse (argc, argv);
 
-  /*LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
+  LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
   LogComponentEnable ("HttpClientApplication", LOG_LEVEL_INFO);
-  LogComponentEnable ("HttpServerApplication", LOG_LEVEL_INFO);*/
+  LogComponentEnable ("HttpServerApplication", LOG_LEVEL_INFO);
 
   if (verbose)
     {
@@ -215,14 +215,16 @@ main (int argc, char *argv[])
   */
     
   // Create the controller node
-  Ptr<Node> controllerSlice1 = CreateObject<Node> ();
-  Ptr<Node> controllerSlice2 = CreateObject<Node> ();
+  NodeContainer controllers;
+  controllers.Create (2);
+  Ptr<ControladorSlice1> controllerSlice1 = CreateObject<ControladorSlice1> ();
+  Ptr<ControladorSlice2> controllerSlice2 = CreateObject<ControladorSlice2> ();
 
 
   // Configure the OpenFlow network domain
   Ptr<OFSwitch13InternalHelper> of13Helper = CreateObject<OFSwitch13InternalHelper> ();
-  Ptr<OFSwitch13Controller> controller1 = of13Helper->InstallController (controllerSlice1);
-  Ptr<OFSwitch13Controller> controller2 = of13Helper->InstallController (controllerSlice2);
+  Ptr<OFSwitch13Controller> controller1 = of13Helper->InstallController (controllers.Get (0), controllerSlice1);
+  Ptr<OFSwitch13Controller> controller2 = of13Helper->InstallController (controllers.Get (1), controllerSlice2);
   OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode, switchPorts);
   of13Helper->CreateOpenFlowChannels ();
 
