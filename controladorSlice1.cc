@@ -45,6 +45,6 @@ ControladorSlice1::DoDispose ()
 void
 ControladorSlice1::HandshakeSuccessful (Ptr<const RemoteSwitch> swtch)
 {
-  DpctlExecute (swtch, "flow-mod cmd=add,table=1,prio=1 in_port=1 write:output=2");
-  DpctlExecute (swtch, "flow-mod cmd=add,table=1,prio=1 in_port=2 write:output=1");
+  DpctlExecute (swtch, "flow-mod cmd=add,table=1,prio=1 in_port=1 apply:output=2");
+  DpctlExecute (swtch, "flow-mod cmd=add,table=1,prio=1 in_port=2 apply:output=1");
 }

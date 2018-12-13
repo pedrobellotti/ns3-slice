@@ -54,12 +54,8 @@ void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap){
   //Slice 2
   c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=1 in_port=3 goto:2");
   c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=1 in_port=4 goto:2");
-
-
-  /*c->DpctlExecute (datap, "flow-mod cmd=add,table=1,prio=1 in_port=1 write:output=2");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=1,prio=1 in_port=2 write:output=1");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=2,prio=1 in_port=3 write:output=4");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=2,prio=1 in_port=4 write:output=3");*/
+  //Table miss
+  c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=0 apply:output=ctrl");
 }
 
 int
@@ -82,10 +78,10 @@ main (int argc, char *argv[])
   LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
   LogComponentEnable ("HttpClientApplication", LOG_LEVEL_INFO);
   LogComponentEnable ("HttpServerApplication", LOG_LEVEL_INFO);
-
+  OFSwitch13Helper::EnableDatapathLogs ();
   if (verbose)
     {
-      OFSwitch13Helper::EnableDatapathLogs ();
+      OFSwitch13Helper::EnableDatapathLogs (); //log de tudo no switch
       LogComponentEnable ("OFSwitch13Interface", LOG_LEVEL_ALL);
       LogComponentEnable ("OFSwitch13Device", LOG_LEVEL_ALL);
       LogComponentEnable ("OFSwitch13Port", LOG_LEVEL_ALL);
@@ -146,8 +142,6 @@ main (int argc, char *argv[])
   internet.Install (hostG1S2);
   internet.Install (routersS2);
 
-  NetDeviceContainer switchPorts;
-
   //Slice 1
   NetDeviceContainer hostG0S1Devices;
   NetDeviceContainer hostG1S1Devices;
@@ -185,7 +179,7 @@ main (int argc, char *argv[])
   //Slice 2 - Grupo 0
   ipv4helpr.SetBase ("10.3.1.0", "255.255.255.0");
   for (size_t i = 0; i < hostG0S2.GetN(); i++){
-    NetDeviceContainer temp = csmaHelper.Install(hostG0S2.Get(i), routersS2.Get(1));
+    NetDeviceContainer temp = csmaHelper.Install(hostG0S2.Get(i), routersS2.Get(0));
     Ipv4InterfaceContainer iptemp = ipv4helpr.Assign (temp);
     IpG0S2.Add(iptemp.Get(0));
     hostG0S2Devices.Add(temp.Get(0));
@@ -222,10 +216,11 @@ main (int argc, char *argv[])
 
 
   // Configure the OpenFlow network domain
+  //NetDeviceContainer switchPorts;
   Ptr<OFSwitch13InternalHelper> of13Helper = CreateObject<OFSwitch13InternalHelper> ();
   Ptr<OFSwitch13Controller> controller1 = of13Helper->InstallController (controllers.Get (0), controllerSlice1);
   Ptr<OFSwitch13Controller> controller2 = of13Helper->InstallController (controllers.Get (1), controllerSlice2);
-  OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode, switchPorts);
+  OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode);
   of13Helper->CreateOpenFlowChannels ();
 
   //Conectando roteadores com o switch  
@@ -237,7 +232,8 @@ main (int argc, char *argv[])
     NetDeviceContainer temp = csmaHelper.Install(routersS1.Get(i), switchNode);
     ipv4helpr.Assign (temp);
     roteador01Devices.Add(temp.Get(0));
-    switchPorts.Add (temp.Get (1));
+    uint32_t portaSlice1 = switches.Get(0)->AddSwitchPort (temp.Get(1))->GetPortNo ();
+    std::cout<<"Slice 1, porta: " << portaSlice1 << std::endl;
     ipv4helpr.NewNetwork();
   }
   //Slice 2
@@ -248,7 +244,8 @@ main (int argc, char *argv[])
     NetDeviceContainer temp = csmaHelper.Install(routersS2.Get(i), switchNode);
     ipv4helpr.Assign (temp);
     roteador23Devices.Add(temp.Get(0));
-    switchPorts.Add (temp.Get (1));
+    uint32_t portaSlice2 = switches.Get(0)->AddSwitchPort (temp.Get(1))->GetPortNo ();
+    std::cout<<"Slice 2, porta: " << portaSlice2 << std::endl;
     ipv4helpr.NewNetwork();
   }
 
@@ -256,10 +253,9 @@ main (int argc, char *argv[])
   uint64_t datap = switches.Get(0)->GetDatapathId();
   Simulator::Schedule (Seconds(0.5), &regraZero, controller1, datap);
 
-
   //Aplicacoes http
   //Group 0 = Clientes; Group 1 = Servidores
-  uint16_t httpServerPort = 80;
+  //uint16_t httpServerPort = 80;
 
   //Slice 1
   //Servidores
@@ -299,7 +295,7 @@ main (int argc, char *argv[])
 
   //Slice 1 <---> Slice 2 (funciona por enquanto, mas nao deveria pois a ideia de slice é isolar as duas redes)
   //Servidores
-  for (size_t i = 0; i < hostG1S2.GetN(); i++){
+  /*for (size_t i = 0; i < hostG1S2.GetN(); i++){
     HttpServerHelper httpServer (httpServerPort);
     ApplicationContainer httpServerApps;
     httpServerApps.Add (httpServer.Install (hostG1S2.Get (i)));
@@ -313,40 +309,41 @@ main (int argc, char *argv[])
     httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
     httpClientApps.Start (Seconds(2.0));
     httpClientApps.Stop (Seconds(simTime));
-  }
+  }*/
+
   // Configure ping application between hosts
-  /*V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (0));
+  /*V4PingHelper pingHelper = V4PingHelper (IpG1S1.GetAddress (0));
   pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-  ApplicationContainer pingApps = pingHelper.Install (hostG1S1.Get (0));
+  ApplicationContainer pingApps = pingHelper.Install (hostG0S1.Get (3));
   pingApps.Start (Seconds (1));
-  pingApps.Stop (Seconds (2));*/
+  pingApps.Stop (Seconds (5));*/
 
   //Ping entre todos os hosts
-  /*for (int p = 0; p < numberOfHosts; p++){
+  for (int p = 0; p < numberOfHosts; p++){
     V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (p));
     pingHelper.SetAttribute ("Verbose", BooleanValue (true));
     for (int t = 0; t < numberOfHosts; t++){
       ApplicationContainer pingApps = pingHelper.Install (hostG1S1.Get (t));
       pingApps.Start (Seconds (1));
-      pingApps.Stop (Seconds (2));
+      pingApps.Stop (Seconds (5));
     }
   }
 
   for (int p = 0; p < numberOfHosts; p++){
-    V4PingHelper pingHelper = V4PingHelper (IpG1S1.GetAddress (p));
+    V4PingHelper pingHelper = V4PingHelper (IpG1S2.GetAddress (p));
     pingHelper.SetAttribute ("Verbose", BooleanValue (true));
     for (int t = 0; t < numberOfHosts; t++){
-      ApplicationContainer pingApps = pingHelper.Install (hostG0S1.Get (t));
+      ApplicationContainer pingApps = pingHelper.Install (hostG0S2.Get (t));
       pingApps.Start (Seconds (1));
-      pingApps.Stop (Seconds (2));
+      pingApps.Stop (Seconds (5));
     }
-  }*/
+  }
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
-  //ArpCache::PopulateArpCaches ();
+  ArpCache::PopulateArpCaches ();
 
   //Imprime as tabelas
-  Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
+  //Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
   if (trace)
@@ -354,9 +351,13 @@ main (int argc, char *argv[])
       //of13Helper->EnableOpenFlowPcap ("openflow");
       //of13Helper->EnableDatapathStats ("switch-stats");
       //csmaHelper.EnablePcap ("switch", switchPorts, true);
-      csmaHelper.EnablePcap ("host0", hostG0S1);
-      csmaHelper.EnablePcap ("host1", hostG1S1);
-      csmaHelper.EnablePcap ("routersS1", routersS1);
+      csmaHelper.EnablePcap ("SLICE1_grupo0", hostG0S1);
+      csmaHelper.EnablePcap ("SLICE1_grupo1", hostG1S1);
+      csmaHelper.EnablePcap ("SLICE1_routersS1", routersS1);
+
+      csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
+      csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);
+      csmaHelper.EnablePcap ("SLICE2_routersS2", routersS2);
     }
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
