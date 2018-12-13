@@ -65,7 +65,7 @@ main (int argc, char *argv[])
   bool verbose = false;
   bool trace = false;
 
-  uint16_t numberOfHosts = 5;
+  uint16_t numberOfHosts = 1;
 
   // Configure command line parameters
   CommandLine cmd;
@@ -216,7 +216,7 @@ main (int argc, char *argv[])
 
 
   // Configure the OpenFlow network domain
-  //NetDeviceContainer switchPorts;
+  NetDeviceContainer switchPorts;
   Ptr<OFSwitch13InternalHelper> of13Helper = CreateObject<OFSwitch13InternalHelper> ();
   Ptr<OFSwitch13Controller> controller1 = of13Helper->InstallController (controllers.Get (0), controllerSlice1);
   Ptr<OFSwitch13Controller> controller2 = of13Helper->InstallController (controllers.Get (1), controllerSlice2);
@@ -233,6 +233,7 @@ main (int argc, char *argv[])
     ipv4helpr.Assign (temp);
     roteador01Devices.Add(temp.Get(0));
     uint32_t portaSlice1 = switches.Get(0)->AddSwitchPort (temp.Get(1))->GetPortNo ();
+    switchPorts.Add(temp.Get(1));
     std::cout<<"Slice 1, porta: " << portaSlice1 << std::endl;
     ipv4helpr.NewNetwork();
   }
@@ -245,6 +246,7 @@ main (int argc, char *argv[])
     ipv4helpr.Assign (temp);
     roteador23Devices.Add(temp.Get(0));
     uint32_t portaSlice2 = switches.Get(0)->AddSwitchPort (temp.Get(1))->GetPortNo ();
+    switchPorts.Add(temp.Get(1));
     std::cout<<"Slice 2, porta: " << portaSlice2 << std::endl;
     ipv4helpr.NewNetwork();
   }
@@ -312,14 +314,14 @@ main (int argc, char *argv[])
   }*/
 
   // Configure ping application between hosts
-  /*V4PingHelper pingHelper = V4PingHelper (IpG1S1.GetAddress (0));
+  V4PingHelper pingHelper = V4PingHelper (IpG1S1.GetAddress (0));
   pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-  ApplicationContainer pingApps = pingHelper.Install (hostG0S1.Get (3));
+  ApplicationContainer pingApps = pingHelper.Install (hostG0S1.Get (0));
   pingApps.Start (Seconds (1));
-  pingApps.Stop (Seconds (5));*/
+  pingApps.Stop (Seconds (5));
 
   //Ping entre todos os hosts
-  for (int p = 0; p < numberOfHosts; p++){
+  /*for (int p = 0; p < numberOfHosts; p++){
     V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (p));
     pingHelper.SetAttribute ("Verbose", BooleanValue (true));
     for (int t = 0; t < numberOfHosts; t++){
@@ -337,10 +339,10 @@ main (int argc, char *argv[])
       pingApps.Start (Seconds (1));
       pingApps.Stop (Seconds (5));
     }
-  }
+  }*/
 
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
-  ArpCache::PopulateArpCaches ();
+  //ArpCache::PopulateArpCaches ();
 
   //Imprime as tabelas
   //Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
@@ -350,14 +352,14 @@ main (int argc, char *argv[])
     {
       //of13Helper->EnableOpenFlowPcap ("openflow");
       //of13Helper->EnableDatapathStats ("switch-stats");
-      //csmaHelper.EnablePcap ("switch", switchPorts, true);
+      csmaHelper.EnablePcap ("switchPorts", switchPorts, true);
       csmaHelper.EnablePcap ("SLICE1_grupo0", hostG0S1);
       csmaHelper.EnablePcap ("SLICE1_grupo1", hostG1S1);
       csmaHelper.EnablePcap ("SLICE1_routersS1", routersS1);
 
-      csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
+     /* csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
       csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);
-      csmaHelper.EnablePcap ("SLICE2_routersS2", routersS2);
+      csmaHelper.EnablePcap ("SLICE2_routersS2", routersS2);*/
     }
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
