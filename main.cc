@@ -230,26 +230,25 @@ main (int argc, char *argv[])
   for (size_t i = 0; i < routersS1.GetN (); i++)
   {
     NetDeviceContainer temp = csmaHelper.Install(routersS1.Get(i), switchNode);
-    ipv4helpr.Assign (temp);
     roteador01Devices.Add(temp.Get(0));
     uint32_t portaSlice1 = switches.Get(0)->AddSwitchPort (temp.Get(1))->GetPortNo ();
     switchPorts.Add(temp.Get(1));
     std::cout<<"Slice 1, porta: " << portaSlice1 << std::endl;
-    ipv4helpr.NewNetwork();
   }
+  ipv4helpr.Assign (roteador01Devices);
+
   //Slice 2
   ipv4helpr.SetBase ("10.22.1.0", "255.255.255.0");
   NetDeviceContainer roteador23Devices;
   for (size_t i = 0; i < routersS2.GetN (); i++)
   {
     NetDeviceContainer temp = csmaHelper.Install(routersS2.Get(i), switchNode);
-    ipv4helpr.Assign (temp);
     roteador23Devices.Add(temp.Get(0));
     uint32_t portaSlice2 = switches.Get(0)->AddSwitchPort (temp.Get(1))->GetPortNo ();
     switchPorts.Add(temp.Get(1));
     std::cout<<"Slice 2, porta: " << portaSlice2 << std::endl;
-    ipv4helpr.NewNetwork();
   }
+  ipv4helpr.Assign (roteador23Devices);
 
   //Separando os slices em suas tabelas
   uint64_t datap = switches.Get(0)->GetDatapathId();
