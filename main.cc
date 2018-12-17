@@ -46,6 +46,7 @@
 #include "ns3/applications-module.h"
 #include "controladorSlice1.h"
 #include "controladorSlice2.h"
+#include "ns3/flow-monitor-module.h"
 
 using namespace ns3;
 
@@ -70,24 +71,26 @@ void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHosts){
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 30;
+  uint16_t simTime = 10;
   bool verbose = false;
   bool trace = false;
 
-  uint16_t numberOfHosts = 2;
+  uint16_t numberOfHosts = 1; //flowmonitor
 
   // Configure command line parameters
   CommandLine cmd;
   cmd.AddValue ("simTime", "Simulation time (seconds)", simTime);
   cmd.AddValue ("verbose", "Enable verbose output", verbose);
   cmd.AddValue ("trace", "Enable datapath stats and pcap traces", trace);
-  cmd.AddValue ("numberOfHosts", "Number of hosts on each group", numberOfHosts);
+  cmd.AddValue ("numHosts", "Number of hosts on each group", numberOfHosts);
   cmd.Parse (argc, argv);
 
   // HTTP app Logs
   LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
-  LogComponentEnable ("HttpClientApplication", LOG_LEVEL_INFO);
-  LogComponentEnable ("HttpServerApplication", LOG_LEVEL_INFO);
+  LogComponentEnable ("HttpClientApplication", LOG_INFO);
+  LogComponentEnable ("HttpClientApplication", LOG_PREFIX_TIME);
+  LogComponentEnable ("HttpServerApplication", LOG_INFO);
+  LogComponentEnable ("HttpServerApplication", LOG_PREFIX_TIME);
   OFSwitch13Helper::EnableDatapathLogs ();
   if (verbose)
     {
@@ -231,7 +234,7 @@ main (int argc, char *argv[])
 
   //Slice 1
   //Servidores
-  for (size_t i = 0; i < hostG1S1.GetN(); i++){
+  /*for (size_t i = 0; i < hostG1S1.GetN(); i++){
     HttpServerHelper httpServer (httpServerPort);
     ApplicationContainer httpServerApps;
     httpServerApps.Add (httpServer.Install (hostG1S1.Get (i)));
@@ -262,33 +265,71 @@ main (int argc, char *argv[])
     HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
     httpClientApps.Add (httpClient.Install (hostG0S2.Get (i)));
     httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime-1));
-  }
+    httpClientApps.Stop (Seconds(simTime));
+  }*/
 
-  //Slice 1 <---> Slice 2 (apenas para checar que nao funciona, pois a ideia de slice é isolar as duas redes)
-  //Servidores
-  /*for (size_t i = 0; i < hostG1S2.GetN(); i++){
+  /* Todos os nós com aplicação de cliente e servidor */
+  //Slice 1 - Grupo 0
+  for (size_t i = 0; i < hostG0S1.GetN(); i++){
+    //App Server
+    HttpServerHelper httpServer (httpServerPort);
+    ApplicationContainer httpServerApps;
+    httpServerApps.Add (httpServer.Install (hostG0S1.Get (i)));
+    httpServerApps.Start (Seconds(1.0));
+    httpServerApps.Stop (Seconds(simTime));
+    //App Cliente
+    ApplicationContainer httpClientApps;
+    HttpClientHelper httpClient (IpG1S1.GetAddress (i), httpServerPort);
+    httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
+    httpClientApps.Start (Seconds(2.0));
+    httpClientApps.Stop (Seconds(simTime));
+  }
+  //Slice 1 - Grupo 1
+  for (size_t i = 0; i < hostG1S1.GetN(); i++){
+    //App Server
+    HttpServerHelper httpServer (httpServerPort);
+    ApplicationContainer httpServerApps;
+    httpServerApps.Add (httpServer.Install (hostG1S1.Get (i)));
+    httpServerApps.Start (Seconds(1.0));
+    httpServerApps.Stop (Seconds(simTime));
+    //App Cliente
+    ApplicationContainer httpClientApps;
+    HttpClientHelper httpClient (IpG0S1.GetAddress (i), httpServerPort);
+    httpClientApps.Add (httpClient.Install (hostG1S1.Get (i)));
+    httpClientApps.Start (Seconds(2.0));
+    httpClientApps.Stop (Seconds(simTime));
+  }
+  //Slice 2 - Grupo 0
+  for (size_t i = 0; i < hostG0S2.GetN(); i++){
+    //App Server
+    HttpServerHelper httpServer (httpServerPort);
+    ApplicationContainer httpServerApps;
+    httpServerApps.Add (httpServer.Install (hostG0S2.Get (i)));
+    httpServerApps.Start (Seconds(1.0));
+    httpServerApps.Stop (Seconds(simTime));
+    //App Cliente
+    ApplicationContainer httpClientApps;
+    HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
+    httpClientApps.Add (httpClient.Install (hostG0S2.Get (i)));
+    httpClientApps.Start (Seconds(2.0));
+    httpClientApps.Stop (Seconds(simTime));
+  }
+  //Slice 2 - Grupo 1
+  for (size_t i = 0; i < hostG1S2.GetN(); i++){
+    //App Server
     HttpServerHelper httpServer (httpServerPort);
     ApplicationContainer httpServerApps;
     httpServerApps.Add (httpServer.Install (hostG1S2.Get (i)));
     httpServerApps.Start (Seconds(1.0));
     httpServerApps.Stop (Seconds(simTime));
-  }
-  //Clientes
-  for (size_t i = 0; i < hostG0S1.GetN(); i++){
+    //App Cliente
     ApplicationContainer httpClientApps;
-    HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
-    httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
+    HttpClientHelper httpClient (IpG0S2.GetAddress (i), httpServerPort);
+    httpClientApps.Add (httpClient.Install (hostG1S2.Get (i)));
     httpClientApps.Start (Seconds(2.0));
     httpClientApps.Stop (Seconds(simTime));
-  }*/
+  }
 
-  // Configure ping application between hosts
-  /*V4PingHelper pingHelper = V4PingHelper (IpG1S1.GetAddress (0));
-  pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-  ApplicationContainer pingApps = pingHelper.Install (hostG0S1.Get (0));
-  pingApps.Start (Seconds (1));
-  pingApps.Stop (Seconds (5));*/
 
   //Ping entre todos os hosts
   /*for (int p = 0; p < numberOfHosts; p++){
@@ -329,8 +370,24 @@ main (int argc, char *argv[])
       csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
       csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);
     }
+
+  //Flowmonitor
+  FlowMonitorHelper flowHelper;
+  Ptr<FlowMonitor> fmS1_G0;
+  Ptr<FlowMonitor> fmS1_G1;
+  Ptr<FlowMonitor> fmS2_G0;
+  Ptr<FlowMonitor> fmS2_G1;
+  fmS1_G0 = flowHelper.Install(hostG0S1);
+  fmS1_G1 = flowHelper.Install(hostG1S1);
+  fmS2_G0 = flowHelper.Install(hostG0S2);
+  fmS2_G1 = flowHelper.Install(hostG1S2);
+
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
+  fmS1_G0->SerializeToXmlFile("slice1_G0.xml", true, true);
+  fmS1_G1->SerializeToXmlFile("slice1_G1.xml", true, true);
+  fmS2_G0->SerializeToXmlFile("slice2_G0.xml", true, true);
+  fmS2_G1->SerializeToXmlFile("slice2_G1.xml", true, true);
   Simulator::Destroy ();
 }
