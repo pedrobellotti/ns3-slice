@@ -43,8 +43,14 @@ ControladorSlice2::DoDispose ()
 }
 
 void
-ControladorSlice2::HandshakeSuccessful (Ptr<const RemoteSwitch> swtch)
+ControladorSlice2::AddRegra (uint32_t portNo, Ipv4Address ipAddr)
 {
-  DpctlExecute (swtch, "flow-mod cmd=add,table=2,prio=1 in_port=3 apply:output=4");
-  DpctlExecute (swtch, "flow-mod cmd=add,table=2,prio=1 in_port=4 apply:output=3");
+  NS_LOG_FUNCTION (this << portNo << ipAddr);
+
+  // Inserindo na tabela 2 a regra que mapeia IP de destino na porta de saída.
+  std::ostringstream cmd;
+  cmd << "flow-mod cmd=add,prio=64,table=2"
+      << " eth_type=0x800,ip_dst=" << ipAddr
+      << " apply:output=" << portNo;
+  DpctlSchedule (1, cmd.str ());
 }

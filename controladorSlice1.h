@@ -37,8 +37,7 @@ public:
   /** Destructor implementation */
   virtual void DoDispose ();
 
-protected:
-  void HandshakeSuccessful (Ptr<const RemoteSwitch> swtch);
+  void AddRegra (uint32_t portNo, Ipv4Address ipAddr);
 
 };
 
