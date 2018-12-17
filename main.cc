@@ -18,13 +18,18 @@
  *
  * The switch is managed by the default learning controller application.
  *
- *                       Learning Controller
+ *                        Slice 1 Controller
  *                                |
  *                       +-----------------+
  *      Host group 0 === |     OpenFlow    | === Server group 0
- *                       |                 |
+ *          (Slice 1)    |                 |     (Slice 1)
+ *      -----------------|------SLICE------|-----------------
+ *          (Slice 2)    |                 |     (Slice 2)
  *      Host group 1 === |      switch     | === Server group 1
  *                       +-----------------+
+ *                                |
+ *                        Slice 2 Controller
+ * 
  * 
  * Links:
  * Host group 0 -> Server group 0
@@ -46,7 +51,6 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("SliceExample");
 
-
 void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHosts){
   int numSlices = 2;
   int numPortas = numHosts*numSlices;
@@ -61,21 +65,12 @@ void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHosts){
       porta++;
     }
   }
-  //Table miss
-  //c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=0 apply:output=ctrl");
-  
-  /*//Slice 1
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=1 in_port=1 goto:1");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=1 in_port=2 goto:1");
-  //Slice 2
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=1 in_port=3 goto:2");
-  c->DpctlExecute (datap, "flow-mod cmd=add,table=0,prio=1 in_port=4 goto:2");*/
 }
 
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 10;
+  uint16_t simTime = 30;
   bool verbose = false;
   bool trace = false;
 
@@ -86,9 +81,10 @@ main (int argc, char *argv[])
   cmd.AddValue ("simTime", "Simulation time (seconds)", simTime);
   cmd.AddValue ("verbose", "Enable verbose output", verbose);
   cmd.AddValue ("trace", "Enable datapath stats and pcap traces", trace);
-  cmd.AddValue ("numberOfHosts", "Number of hosts", numberOfHosts);
+  cmd.AddValue ("numberOfHosts", "Number of hosts on each group", numberOfHosts);
   cmd.Parse (argc, argv);
 
+  // HTTP app Logs
   LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
   LogComponentEnable ("HttpClientApplication", LOG_LEVEL_INFO);
   LogComponentEnable ("HttpServerApplication", LOG_LEVEL_INFO);
@@ -127,7 +123,6 @@ main (int argc, char *argv[])
 
   NodeContainer hostG1S2;
   hostG1S2.Create (numberOfHosts);
-
 
   // Create the switch node
   Ptr<Node> switchNode = CreateObject<Node> ();
@@ -267,7 +262,7 @@ main (int argc, char *argv[])
     HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
     httpClientApps.Add (httpClient.Install (hostG0S2.Get (i)));
     httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime));
+    httpClientApps.Stop (Seconds(simTime-1));
   }
 
   //Slice 1 <---> Slice 2 (apenas para checar que nao funciona, pois a ideia de slice é isolar as duas redes)
@@ -319,9 +314,6 @@ main (int argc, char *argv[])
   of13Helper->CreateOpenFlowChannels ();
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
   ArpCache::PopulateArpCaches ();
-  /*Ipv4GlobalRoutingHelper g;
-  Ptr<OutputStreamWrapper> routingStream = Create<OutputStreamWrapper> ("dynamic-global-routing.log", std::ios::out);
-  g.PrintRoutingTableAllAt (Seconds (2), routingStream);*/
 
   //Imprime as tabelas
   //Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
@@ -334,9 +326,8 @@ main (int argc, char *argv[])
       csmaHelper.EnablePcap ("switchPorts", switchPorts, true);
       csmaHelper.EnablePcap ("SLICE1_grupo0", hostG0S1);
       csmaHelper.EnablePcap ("SLICE1_grupo1", hostG1S1);
-
-     /* csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
-      csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);*/
+      csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
+      csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);
     }
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
