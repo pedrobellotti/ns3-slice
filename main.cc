@@ -47,6 +47,7 @@
 #include "controladorSlice1.h"
 #include "controladorSlice2.h"
 #include "ns3/flow-monitor-module.h"
+#include "time.h"
 
 using namespace ns3;
 
@@ -71,11 +72,14 @@ void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHosts){
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 10;
+  uint16_t simTime = 60;
   bool verbose = false;
   bool trace = false;
 
-  uint16_t numberOfHosts = 1; //flowmonitor
+  uint16_t numberOfHosts = 63; //maximo de hosts possivel (63 hosts * 4 grupos = 252 portas)
+
+  clock_t relogioInicio, relogioFinal;
+  relogioInicio = clock();
 
   // Configure command line parameters
   CommandLine cmd;
@@ -86,11 +90,11 @@ main (int argc, char *argv[])
   cmd.Parse (argc, argv);
 
   // HTTP app Logs
-  LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
+  /*LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
   LogComponentEnable ("HttpClientApplication", LOG_INFO);
   LogComponentEnable ("HttpClientApplication", LOG_PREFIX_TIME);
   LogComponentEnable ("HttpServerApplication", LOG_INFO);
-  LogComponentEnable ("HttpServerApplication", LOG_PREFIX_TIME);
+  LogComponentEnable ("HttpServerApplication", LOG_PREFIX_TIME);*/
   OFSwitch13Helper::EnableDatapathLogs ();
   if (verbose)
     {
@@ -165,6 +169,7 @@ main (int argc, char *argv[])
   Ptr<ControladorSlice1> controllerSlice1 = CreateObject<ControladorSlice1> ();
   Ptr<ControladorSlice2> controllerSlice2 = CreateObject<ControladorSlice2> ();
   Ptr<OFSwitch13InternalHelper> of13Helper = CreateObject<OFSwitch13InternalHelper> ();
+  of13Helper->SetDeviceAttribute ("CpuCapacity", DataRateValue (DataRate ("100Mbps")));
   Ptr<OFSwitch13Controller> controller1 = of13Helper->InstallController (controllers.Get (0), controllerSlice1);
   Ptr<OFSwitch13Controller> controller2 = of13Helper->InstallController (controllers.Get (1), controllerSlice2);
 
@@ -363,31 +368,24 @@ main (int argc, char *argv[])
   if (trace)
     {
       //of13Helper->EnableOpenFlowPcap ("openflow");
-      //of13Helper->EnableDatapathStats ("switch-stats");
-      csmaHelper.EnablePcap ("switchPorts", switchPorts, true);
+      of13Helper->EnableDatapathStats ("switch-stats");
+      /*csmaHelper.EnablePcap ("switchPorts", switchPorts, true);
       csmaHelper.EnablePcap ("SLICE1_grupo0", hostG0S1);
       csmaHelper.EnablePcap ("SLICE1_grupo1", hostG1S1);
       csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
-      csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);
+      csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);*/
     }
 
   //Flowmonitor
   FlowMonitorHelper flowHelper;
-  Ptr<FlowMonitor> fmS1_G0;
-  Ptr<FlowMonitor> fmS1_G1;
-  Ptr<FlowMonitor> fmS2_G0;
-  Ptr<FlowMonitor> fmS2_G1;
-  fmS1_G0 = flowHelper.Install(hostG0S1);
-  fmS1_G1 = flowHelper.Install(hostG1S1);
-  fmS2_G0 = flowHelper.Install(hostG0S2);
-  fmS2_G1 = flowHelper.Install(hostG1S2);
+  Ptr<FlowMonitor> monitor1;
+  monitor1 = flowHelper.Install(NodeContainer (hostG0S1,hostG1S1,hostG0S2,hostG1S2));
 
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
-  fmS1_G0->SerializeToXmlFile("slice1_G0.xml", true, true);
-  fmS1_G1->SerializeToXmlFile("slice1_G1.xml", true, true);
-  fmS2_G0->SerializeToXmlFile("slice2_G0.xml", true, true);
-  fmS2_G1->SerializeToXmlFile("slice2_G1.xml", true, true);
+  monitor1->SerializeToXmlFile("sliceExample.xml", true, true);
   Simulator::Destroy ();
+  relogioFinal = clock();
+  cout << "Tempo: " << (1000.0 * (relogioFinal-relogioInicio) / CLOCKS_PER_SEC)/1000.0 << " segundos"<< endl;
 }
