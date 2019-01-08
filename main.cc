@@ -72,11 +72,11 @@ void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHosts){
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 60;
+  uint16_t simTime = 300;
   bool verbose = false;
   bool trace = false;
 
-  uint16_t numberOfHosts = 63; //maximo de hosts possivel (63 hosts * 4 grupos = 252 portas)
+  uint16_t numberOfHosts = 50; //Lembrete: maximo de portas = 4096
 
   clock_t relogioInicio, relogioFinal;
   relogioInicio = clock();
@@ -387,5 +387,7 @@ main (int argc, char *argv[])
   monitor1->SerializeToXmlFile("sliceExample.xml", true, true);
   Simulator::Destroy ();
   relogioFinal = clock();
-  cout << "Tempo: " << (1000.0 * (relogioFinal-relogioInicio) / CLOCKS_PER_SEC)/1000.0 << " segundos"<< endl;
+  std::cout << "Numero de hosts: " << numberOfHosts << std::endl;
+  std::cout << "Tempo de simulacao: " << simTime << std::endl;
+  std::cout << "Tempo real gasto: " << (1000.0 * (relogioFinal-relogioInicio) / CLOCKS_PER_SEC)/1000.0 << " segundos"<< std::endl;
 }
