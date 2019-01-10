@@ -76,7 +76,7 @@ main (int argc, char *argv[])
   bool verbose = false;
   bool trace = false;
 
-  uint16_t numberOfHosts = 50; //Lembrete: maximo de portas = 4096
+  uint16_t numberOfHosts = 50; //Lembrete: maximo de portas = 16384
 
   clock_t relogioInicio, relogioFinal;
   relogioInicio = clock();
@@ -95,7 +95,6 @@ main (int argc, char *argv[])
   LogComponentEnable ("HttpClientApplication", LOG_PREFIX_TIME);
   LogComponentEnable ("HttpServerApplication", LOG_INFO);
   LogComponentEnable ("HttpServerApplication", LOG_PREFIX_TIME);*/
-  OFSwitch13Helper::EnableDatapathLogs ();
   if (verbose)
     {
       OFSwitch13Helper::EnableDatapathLogs (); //log de tudo no switch
@@ -179,7 +178,7 @@ main (int argc, char *argv[])
 
   /* Dividindo os dois grupos de Hosts de cada slice */
   //Slice 1 - Grupo 0
-  ipv4helpr.SetBase ("10.1.1.0", "255.255.255.0");
+  ipv4helpr.SetBase ("10.1.1.0", "255.255.0.0");
   for (size_t i = 0; i < hostG0S1.GetN(); i++){
     // Conectando hosts com o switch.
     NetDeviceContainer link = csmaHelper.Install (switchNode, hostG0S1.Get (i));
@@ -204,7 +203,7 @@ main (int argc, char *argv[])
     controllerSlice1->AddRegra (numPorta, tempIpIface.GetAddress (0));
   }
   //Slice 2 - Grupo 0
-  ipv4helpr.SetBase ("10.2.2.0", "255.255.255.0");
+  ipv4helpr.SetBase ("10.2.2.0", "255.255.0.0");
   for (size_t i = 0; i < hostG0S2.GetN(); i++){
     // Conectando hosts com o switch.
     NetDeviceContainer link = csmaHelper.Install (switchNode, hostG0S2.Get (i));
