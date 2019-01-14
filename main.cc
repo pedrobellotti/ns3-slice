@@ -82,6 +82,7 @@ main (int argc, char *argv[])
   uint16_t simTime = 300;
   bool verbose = false;
   bool trace = false;
+  bool pcap = false;
 
   //Lembrete: maximo de portas = 16384
   uint16_t hostsSlice1 = 5;
@@ -94,18 +95,14 @@ main (int argc, char *argv[])
   CommandLine cmd;
   cmd.AddValue ("simTime", "Simulation time (seconds)", simTime);
   cmd.AddValue ("verbose", "Enable verbose output", verbose);
-  cmd.AddValue ("trace", "Enable datapath stats and pcap traces", trace);
+  cmd.AddValue ("trace", "Enable datapath stats", trace);
+  cmd.AddValue ("pcap", "Enable pcap traces", pcap);
   cmd.AddValue ("hostsSlice1", "Number of hosts on each group (slice 1)", hostsSlice1);
   cmd.AddValue ("hostsSlice2", "Number of hosts on each group (slice 2)", hostsSlice2);
   cmd.Parse (argc, argv);
 
   uint16_t stop = simTime-5;
-  // HTTP app Logs
-  /*LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
-  LogComponentEnable ("HttpClientApplication", LOG_INFO);
-  LogComponentEnable ("HttpClientApplication", LOG_PREFIX_TIME);
-  LogComponentEnable ("HttpServerApplication", LOG_INFO);
-  LogComponentEnable ("HttpServerApplication", LOG_PREFIX_TIME);*/
+
   if (verbose)
     {
       OFSwitch13Helper::EnableDatapathLogs (); //log de tudo no switch
@@ -247,42 +244,6 @@ main (int argc, char *argv[])
   //Group 0 = Clientes; Group 1 = Servidores
   uint16_t httpServerPort = 80;
 
-  //Slice 1
-  //Servidores
-  /*for (size_t i = 0; i < hostG1S1.GetN(); i++){
-    HttpServerHelper httpServer (httpServerPort);
-    ApplicationContainer httpServerApps;
-    httpServerApps.Add (httpServer.Install (hostG1S1.Get (i)));
-    httpServerApps.Start (Seconds(1.0));
-    httpServerApps.Stop (Seconds(simTime));
-  }
-  //Clientes
-  for (size_t i = 0; i < hostG0S1.GetN(); i++){
-    ApplicationContainer httpClientApps;
-    HttpClientHelper httpClient (IpG1S1.GetAddress (i), httpServerPort);
-    httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
-    httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime));
-  }
-
-  //Slice 2
-  //Servidores
-  for (size_t i = 0; i < hostG1S2.GetN(); i++){
-    HttpServerHelper httpServer (httpServerPort);
-    ApplicationContainer httpServerApps;
-    httpServerApps.Add (httpServer.Install (hostG1S2.Get (i)));
-    httpServerApps.Start (Seconds(1.0));
-    httpServerApps.Stop (Seconds(simTime));
-  }
-  //Clientes
-  for (size_t i = 0; i < hostG0S2.GetN(); i++){
-    ApplicationContainer httpClientApps;
-    HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
-    httpClientApps.Add (httpClient.Install (hostG0S2.Get (i)));
-    httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime));
-  }*/
-
   /* Distribuicao do tempo */
   Ptr<UniformRandomVariable> x = CreateObject<UniformRandomVariable> ();
   x->SetAttribute ("Min", DoubleValue (3));
@@ -349,28 +310,6 @@ main (int argc, char *argv[])
     httpClientApps.Stop (Seconds(stop));
   }
 
-
-  //Ping entre todos os hosts
-  /*for (int p = 0; p < hostsSlice1; p++){
-    V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (p));
-    pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-    for (int t = 0; t < hostsSlice1; t++){
-      ApplicationContainer pingApps = pingHelper.Install (hostG1S1.Get (t));
-      pingApps.Start (Seconds (1));
-      pingApps.Stop (Seconds (5));
-    }
-  }
-
-  for (int p = 0; p < hostsSlice2; p++){
-    V4PingHelper pingHelper = V4PingHelper (IpG1S2.GetAddress (p));
-    pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-    for (int t = 0; t < hostsSlice2; t++){
-      ApplicationContainer pingApps = pingHelper.Install (hostG0S2.Get (t));
-      pingApps.Start (Seconds (1));
-      pingApps.Stop (Seconds (5));
-    }
-  }*/
-
   of13Helper->CreateOpenFlowChannels ();
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
   ArpCache::PopulateArpCaches ();
@@ -379,15 +318,17 @@ main (int argc, char *argv[])
   //Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
-  if (trace)
-    {
-      //of13Helper->EnableOpenFlowPcap ("openflow");
+  if (trace){
       of13Helper->EnableDatapathStats ("switch-stats");
-      /*csmaHelper.EnablePcap ("switchPorts", switchPorts, true);
+  }
+  if (pcap)
+    {
+      of13Helper->EnableOpenFlowPcap ("openflow");
+      csmaHelper.EnablePcap ("switchPorts", switchPorts, true);
       csmaHelper.EnablePcap ("SLICE1_grupo0", hostG0S1);
       csmaHelper.EnablePcap ("SLICE1_grupo1", hostG1S1);
       csmaHelper.EnablePcap ("SLICE2_grupo0", hostG0S2);
-      csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);*/
+      csmaHelper.EnablePcap ("SLICE2_grupo1", hostG1S2);
     }
 
   //Flowmonitor
@@ -398,7 +339,7 @@ main (int argc, char *argv[])
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
-  monitor1->SerializeToXmlFile("sliceExample.xml", true, true);
+  monitor1->SerializeToXmlFile("flowmonitor" + std::to_string(hostsSlice1) + "_" + std::to_string(hostsSlice2) + ".xml", true, true);
   Simulator::Destroy ();
   relogioFinal = clock();
   std::cout << "Numero de hosts slice 1: " << hostsSlice1 << std::endl;
