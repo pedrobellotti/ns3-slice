@@ -53,20 +53,27 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("SliceExample");
 
-void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHosts){
+void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHostsS1, uint16_t numHostsS2){
   int numSlices = 2;
-  int numPortas = numHosts*numSlices;
+  int numPortas1 = numHostsS1*numSlices;
+  int numPortas2 = numHostsS2*numSlices;
   int porta = 1;
-  for (int s = 0; s < numSlices; s++){
-    for (int h = 0; h < numPortas; h++){
+  for (int h = 0; h < numPortas1; h++){
       std::ostringstream cmd;
       cmd << "flow-mod cmd=add,prio=1,table=0"
       << " in_port=" << porta
-      << " goto:" << s+1;
+      << " goto:" << 1;
+      c->DpctlExecute (datap, cmd.str());
+      porta++;
+  }
+  for (int k = 0; k < numPortas2; k++){
+      std::ostringstream cmd;
+      cmd << "flow-mod cmd=add,prio=1,table=0"
+      << " in_port=" << porta
+      << " goto:" << 2;
       c->DpctlExecute (datap, cmd.str());
       porta++;
     }
-  }
 }
 
 int
@@ -76,7 +83,9 @@ main (int argc, char *argv[])
   bool verbose = false;
   bool trace = false;
 
-  uint16_t numberOfHosts = 50; //Lembrete: maximo de portas = 16384
+  //Lembrete: maximo de portas = 16384
+  uint16_t hostsSlice1 = 5;
+  uint16_t hostsSlice2 = 3; 
 
   clock_t relogioInicio, relogioFinal;
   relogioInicio = clock();
@@ -86,9 +95,11 @@ main (int argc, char *argv[])
   cmd.AddValue ("simTime", "Simulation time (seconds)", simTime);
   cmd.AddValue ("verbose", "Enable verbose output", verbose);
   cmd.AddValue ("trace", "Enable datapath stats and pcap traces", trace);
-  cmd.AddValue ("numHosts", "Number of hosts on each group", numberOfHosts);
+  cmd.AddValue ("hostsSlice1", "Number of hosts on each group (slice 1)", hostsSlice1);
+  cmd.AddValue ("hostsSlice2", "Number of hosts on each group (slice 2)", hostsSlice2);
   cmd.Parse (argc, argv);
 
+  uint16_t stop = simTime-5;
   // HTTP app Logs
   /*LogComponentEnable ("SliceExample", LOG_LEVEL_INFO);
   LogComponentEnable ("HttpClientApplication", LOG_INFO);
@@ -118,17 +129,17 @@ main (int argc, char *argv[])
   // Create host nodes
   // Slice 1
   NodeContainer hostG0S1;
-  hostG0S1.Create (numberOfHosts);
+  hostG0S1.Create (hostsSlice1);
 
   NodeContainer hostG1S1;
-  hostG1S1.Create (numberOfHosts);
+  hostG1S1.Create (hostsSlice1);
 
   // Slice 2
   NodeContainer hostG0S2;
-  hostG0S2.Create (numberOfHosts);
+  hostG0S2.Create (hostsSlice2);
 
   NodeContainer hostG1S2;
-  hostG1S2.Create (numberOfHosts);
+  hostG1S2.Create (hostsSlice2);
 
   // Create the switch node
   Ptr<Node> switchNode = CreateObject<Node> ();
@@ -230,7 +241,7 @@ main (int argc, char *argv[])
     
   //Separando os slices em suas tabelas
   uint64_t datap = switches.Get(0)->GetDatapathId();
-  Simulator::Schedule (Seconds(0.5), &regraZero, controller1, datap, numberOfHosts);
+  Simulator::Schedule (Seconds(0.5), &regraZero, controller1, datap, hostsSlice1, hostsSlice2);
 
   //Aplicacoes http
   //Group 0 = Clientes; Group 1 = Servidores
@@ -272,6 +283,10 @@ main (int argc, char *argv[])
     httpClientApps.Stop (Seconds(simTime));
   }*/
 
+  /* Distribuicao do tempo */
+  Ptr<UniformRandomVariable> x = CreateObject<UniformRandomVariable> ();
+  x->SetAttribute ("Min", DoubleValue (3));
+  x->SetAttribute ("Max", DoubleValue (10));
   /* Todos os nós com aplicação de cliente e servidor */
   //Slice 1 - Grupo 0
   for (size_t i = 0; i < hostG0S1.GetN(); i++){
@@ -279,14 +294,14 @@ main (int argc, char *argv[])
     HttpServerHelper httpServer (httpServerPort);
     ApplicationContainer httpServerApps;
     httpServerApps.Add (httpServer.Install (hostG0S1.Get (i)));
-    httpServerApps.Start (Seconds(1.0));
-    httpServerApps.Stop (Seconds(simTime));
+    httpServerApps.Start (Seconds(2));
+    httpServerApps.Stop (Seconds(stop));
     //App Cliente
     ApplicationContainer httpClientApps;
     HttpClientHelper httpClient (IpG1S1.GetAddress (i), httpServerPort);
     httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
-    httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime));
+    httpClientApps.Start (Seconds(x->GetValue()));
+    httpClientApps.Stop (Seconds(stop));
   }
   //Slice 1 - Grupo 1
   for (size_t i = 0; i < hostG1S1.GetN(); i++){
@@ -294,14 +309,14 @@ main (int argc, char *argv[])
     HttpServerHelper httpServer (httpServerPort);
     ApplicationContainer httpServerApps;
     httpServerApps.Add (httpServer.Install (hostG1S1.Get (i)));
-    httpServerApps.Start (Seconds(1.0));
-    httpServerApps.Stop (Seconds(simTime));
+    httpServerApps.Start (Seconds(2));
+    httpServerApps.Stop (Seconds(stop));
     //App Cliente
     ApplicationContainer httpClientApps;
     HttpClientHelper httpClient (IpG0S1.GetAddress (i), httpServerPort);
     httpClientApps.Add (httpClient.Install (hostG1S1.Get (i)));
-    httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime));
+    httpClientApps.Start (Seconds(x->GetValue()));
+    httpClientApps.Stop (Seconds(stop));
   }
   //Slice 2 - Grupo 0
   for (size_t i = 0; i < hostG0S2.GetN(); i++){
@@ -309,14 +324,14 @@ main (int argc, char *argv[])
     HttpServerHelper httpServer (httpServerPort);
     ApplicationContainer httpServerApps;
     httpServerApps.Add (httpServer.Install (hostG0S2.Get (i)));
-    httpServerApps.Start (Seconds(1.0));
-    httpServerApps.Stop (Seconds(simTime));
+    httpServerApps.Start (Seconds(2));
+    httpServerApps.Stop (Seconds(stop));
     //App Cliente
     ApplicationContainer httpClientApps;
     HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
     httpClientApps.Add (httpClient.Install (hostG0S2.Get (i)));
-    httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime));
+    httpClientApps.Start (Seconds(x->GetValue()));
+    httpClientApps.Stop (Seconds(stop));
   }
   //Slice 2 - Grupo 1
   for (size_t i = 0; i < hostG1S2.GetN(); i++){
@@ -324,32 +339,32 @@ main (int argc, char *argv[])
     HttpServerHelper httpServer (httpServerPort);
     ApplicationContainer httpServerApps;
     httpServerApps.Add (httpServer.Install (hostG1S2.Get (i)));
-    httpServerApps.Start (Seconds(1.0));
-    httpServerApps.Stop (Seconds(simTime));
+    httpServerApps.Start (Seconds(2));
+    httpServerApps.Stop (Seconds(stop));
     //App Cliente
     ApplicationContainer httpClientApps;
     HttpClientHelper httpClient (IpG0S2.GetAddress (i), httpServerPort);
     httpClientApps.Add (httpClient.Install (hostG1S2.Get (i)));
-    httpClientApps.Start (Seconds(2.0));
-    httpClientApps.Stop (Seconds(simTime));
+    httpClientApps.Start (Seconds(x->GetValue()));
+    httpClientApps.Stop (Seconds(stop));
   }
 
 
   //Ping entre todos os hosts
-  /*for (int p = 0; p < numberOfHosts; p++){
+  /*for (int p = 0; p < hostsSlice1; p++){
     V4PingHelper pingHelper = V4PingHelper (IpG0S1.GetAddress (p));
     pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-    for (int t = 0; t < numberOfHosts; t++){
+    for (int t = 0; t < hostsSlice1; t++){
       ApplicationContainer pingApps = pingHelper.Install (hostG1S1.Get (t));
       pingApps.Start (Seconds (1));
       pingApps.Stop (Seconds (5));
     }
-  }*/
+  }
 
-  /*for (int p = 0; p < numberOfHosts; p++){
+  for (int p = 0; p < hostsSlice2; p++){
     V4PingHelper pingHelper = V4PingHelper (IpG1S2.GetAddress (p));
     pingHelper.SetAttribute ("Verbose", BooleanValue (true));
-    for (int t = 0; t < numberOfHosts; t++){
+    for (int t = 0; t < hostsSlice2; t++){
       ApplicationContainer pingApps = pingHelper.Install (hostG0S2.Get (t));
       pingApps.Start (Seconds (1));
       pingApps.Stop (Seconds (5));
@@ -386,7 +401,8 @@ main (int argc, char *argv[])
   monitor1->SerializeToXmlFile("sliceExample.xml", true, true);
   Simulator::Destroy ();
   relogioFinal = clock();
-  std::cout << "Numero de hosts: " << numberOfHosts << std::endl;
+  std::cout << "Numero de hosts slice 1: " << hostsSlice1 << std::endl;
+  std::cout << "Numero de hosts slice 2: " << hostsSlice2 << std::endl;
   std::cout << "Tempo de simulacao: " << simTime << std::endl;
   std::cout << "Tempo real gasto: " << (1000.0 * (relogioFinal-relogioInicio) / CLOCKS_PER_SEC)/1000.0 << " segundos"<< std::endl;
 }
