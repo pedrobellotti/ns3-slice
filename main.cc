@@ -51,6 +51,10 @@
 
 using namespace ns3;
 
+void teste(Ptr<FlowMonitor> monitor1){
+    monitor1->StopRightNow();
+}
+
 NS_LOG_COMPONENT_DEFINE ("SliceExample");
 
 void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHostsS1, uint16_t numHostsS2){
@@ -79,14 +83,14 @@ void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHostsS1,
 int
 main (int argc, char *argv[])
 {
-  uint16_t simTime = 300;
+  uint16_t simTime = 400;
   bool verbose = false;
   bool trace = false;
   bool pcap = false;
 
   //Lembrete: maximo de portas = 16384
   uint16_t hostsSlice1 = 5;
-  uint16_t hostsSlice2 = 3; 
+  uint16_t hostsSlice2 = 5;
 
   clock_t relogioInicio, relogioFinal;
   relogioInicio = clock();
@@ -101,7 +105,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("hostsSlice2", "Number of hosts on each group (slice 2)", hostsSlice2);
   cmd.Parse (argc, argv);
 
-  uint16_t stop = simTime-5;
+  uint16_t stop = simTime-100;
 
   if (verbose)
     {
@@ -319,7 +323,7 @@ main (int argc, char *argv[])
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
   if (trace){
-      of13Helper->EnableDatapathStats ("switch-stats");
+      of13Helper->EnableDatapathStats ("switch-stats"+ std::to_string(hostsSlice1) + "_" + std::to_string(hostsSlice2));
   }
   if (pcap)
     {
@@ -335,10 +339,13 @@ main (int argc, char *argv[])
   FlowMonitorHelper flowHelper;
   Ptr<FlowMonitor> monitor1;
   monitor1 = flowHelper.Install(NodeContainer (hostG0S1,hostG1S1,hostG0S2,hostG1S2));
+  monitor1->Start(Seconds(100));
+  //Simulator::Schedule (Seconds(1), &teste, monitor1);
 
   // Run the simulation
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
+  monitor1->Stop(Seconds(1));
   monitor1->SerializeToXmlFile("flowmonitor" + std::to_string(hostsSlice1) + "_" + std::to_string(hostsSlice2) + ".xml", true, true);
   Simulator::Destroy ();
   relogioFinal = clock();
