@@ -126,7 +126,6 @@ class Flow(object):
         else:
             self.txBitrate = None
         self.lost = float(flow_el.get('lostPackets'))
-        #print "rxBytes: %s; self.txPackets: %s; self.rxPackets: %s; lostPackets: %s" % (flow_el.get('rxBytes'), self.txPackets, self.rxPackets, lost)
         if self.rxPackets == 0:
             self.packetLossRatio = None
         else:
@@ -194,7 +193,6 @@ class Simulation(object):
 
 def main(argv):
     file_obj = open(argv[1])
-    print "Reading XML file ",
  
     sys.stdout.flush()        
     level = 0
@@ -208,9 +206,8 @@ def main(argv):
                 sim = Simulation(elem)
                 sim_list.append(sim)
                 elem.clear() # won't need this any more
-                sys.stdout.write(".")
+                #sys.stdout.write(".")
                 sys.stdout.flush()
-    print " done."
 
     dropSlice1 = 0
     dropSlice2 = 0
@@ -221,9 +218,6 @@ def main(argv):
     for sim in sim_list:
         for flow in sim.flows:
             t = flow.fiveTuple
-            proto = {6: 'TCP', 17: 'UDP'} [t.protocol]
-            print "FlowID: %i (%s %s/%s --> %s/%i)" % \
-                (flow.flowId, proto, t.sourceAddress, t.sourcePort, t.destinationAddress, t.destinationPort)
             if t.sourceAddress[3] is '1':
                 dropSlice1 += flow.lost
                 TxpacSlice1 += flow.txPackets
@@ -232,23 +226,13 @@ def main(argv):
                 dropSlice2 += flow.lost
                 TxpacSlice2 += flow.txPackets
                 RxpacSlice2 += flow.rxPackets
-            if flow.lost is None:
-                print "\tPackets Lost: None"
-            else:
-                print "\tPackets Lost: %.0f" % (flow.lost)
-            if flow.packetLossRatio is None:
-                print "\tPacket Loss Ratio: None"
-            else:
-                print "\tPacket Loss Ratio: %.2f %%" % (flow.packetLossRatio*100)
-
-    print "\n----Slice 1----"
-    print " TX total slice 1: %.0f" % (TxpacSlice1)
-    print " RX total slice 1: %.0f" % (RxpacSlice1)
-    print " Total drop slice 1: %.0f" % (dropSlice1)
-    print "\n----Slice 2----"
-    print " TX total slice 2: %.0f" % (TxpacSlice2)
-    print " RX total slice 2: %.0f" % (RxpacSlice2)
-    print " Total drop slice 2: %.0f" % (dropSlice2)
+    
+    numHosts = argv[2]
+    rng = argv[3]
+    aux = open("resultados.txt","a+")
+    aux.write("%s-%s\t\t%s\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f" % (numHosts,numHosts,rng,TxpacSlice1,RxpacSlice1,dropSlice1,TxpacSlice2,RxpacSlice2,dropSlice2))
+    aux.write("\n")
+    aux.close()
 
 if __name__ == '__main__':
     main(sys.argv)
