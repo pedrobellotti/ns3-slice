@@ -29,12 +29,12 @@
  *                       +-----------------+
  *                                |
  *                        Slice 2 Controller
- * 
- * 
+ *
+ *
  * Links:
  * Host group 0 -> Server group 0
  * Host group 1 -> Server group 1
- * 
+ *
  */
 
 #include <ns3/core-module.h>
@@ -53,25 +53,28 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("SliceExample");
 
-void regraZero(Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHostsS1, uint16_t numHostsS2){
+void regraZero (Ptr<OFSwitch13Controller> c, uint64_t datap, uint16_t numHostsS1, uint16_t numHostsS2)
+{
   int numSlices = 2;
-  int numPortas1 = numHostsS1*numSlices;
-  int numPortas2 = numHostsS2*numSlices;
+  int numPortas1 = numHostsS1 * numSlices;
+  int numPortas2 = numHostsS2 * numSlices;
   int porta = 1;
-  for (int h = 0; h < numPortas1; h++){
+  for (int h = 0; h < numPortas1; h++)
+    {
       std::ostringstream cmd;
       cmd << "flow-mod cmd=add,prio=1,table=0"
-      << " in_port=" << porta
-      << " goto:" << 1;
-      c->DpctlExecute (datap, cmd.str());
+          << " in_port=" << porta
+          << " goto:" << 1;
+      c->DpctlExecute (datap, cmd.str ());
       porta++;
-  }
-  for (int k = 0; k < numPortas2; k++){
+    }
+  for (int k = 0; k < numPortas2; k++)
+    {
       std::ostringstream cmd;
       cmd << "flow-mod cmd=add,prio=1,table=0"
-      << " in_port=" << porta
-      << " goto:" << 2;
-      c->DpctlExecute (datap, cmd.str());
+          << " in_port=" << porta
+          << " goto:" << 2;
+      c->DpctlExecute (datap, cmd.str ());
       porta++;
     }
 }
@@ -85,11 +88,11 @@ main (int argc, char *argv[])
   bool pcap = false;
 
   //Lembrete: maximo de portas = 16384
-  uint16_t hostsSlice1 = 100;
-  uint16_t hostsSlice2 = 100;
+  uint16_t hostsSlice1 = 50;
+  uint16_t hostsSlice2 = 50;
 
   clock_t relogioInicio, relogioFinal;
-  relogioInicio = clock();
+  relogioInicio = clock ();
 
   // Configure command line parameters
   CommandLine cmd;
@@ -101,7 +104,7 @@ main (int argc, char *argv[])
   cmd.AddValue ("hostsSlice2", "Number of hosts on each group (slice 2)", hostsSlice2);
   cmd.Parse (argc, argv);
 
-  uint16_t stop = simTime-100;
+  uint16_t stop = simTime - 100;
 
   if (verbose)
     {
@@ -116,7 +119,7 @@ main (int argc, char *argv[])
       LogComponentEnable ("OFSwitch13Helper", LOG_LEVEL_ALL);
       LogComponentEnable ("OFSwitch13InternalHelper", LOG_LEVEL_ALL);
     }
-  
+
   // Enable checksum computations (required by OFSwitch13 module)
   GlobalValue::Bind ("ChecksumEnabled", BooleanValue (true));
 
@@ -184,61 +187,83 @@ main (int argc, char *argv[])
   NetDeviceContainer switchPorts;
   OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode);
 
+  // Configurando um token bucket para cada slice
+  Config::SetDefault ("ns3::TokenBucket::Size", UintegerValue (50000000));
+  Config::SetDefault ("ns3::TokenBucket::TimeoutInterval", TimeValue (MilliSeconds (50)));
+  Config::SetDefault ("ns3::TokenBucket::Rate", StringValue ("50Mbps"));
+  // Rate limiter slice 1
+  uint32_t rl = switches.Get (0)->CreateRateLimiter ();
+
+  // Rate limiter slice 2
+  uint32_t rl2 = switches.Get (0)->CreateRateLimiter ();
+
   /* Dividindo os dois grupos de Hosts de cada slice */
   //Slice 1 - Grupo 0
   ipv4helpr.SetBase ("10.1.0.0", "255.255.0.0");
-  for (size_t i = 0; i < hostG0S1.GetN(); i++){
-    // Conectando hosts com o switch.
-    NetDeviceContainer link = csmaHelper.Install (switchNode, hostG0S1.Get (i));
-    uint32_t numPorta = switches.Get(0)->AddSwitchPort (link.Get (0))->GetPortNo ();
-    switchPorts.Add(link.Get(0));
-    hostG0S1Devices.Add (link.Get (1));
-    // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
-    Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
-    IpG0S1.Add (tempIpIface);
-    controllerSlice1->AddRegra (numPorta, tempIpIface.GetAddress (0));
-  }
+  for (size_t i = 0; i < hostG0S1.GetN (); i++)
+    {
+      // Conectando hosts com o switch.
+      NetDeviceContainer link = csmaHelper.Install (switchNode, hostG0S1.Get (i));
+      uint32_t numPorta = switches.Get (0)->AddSwitchPort (link.Get (0))->GetPortNo ();
+      switchPorts.Add (link.Get (0));
+      hostG0S1Devices.Add (link.Get (1));
+      // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
+      Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
+      IpG0S1.Add (tempIpIface);
+      controllerSlice1->AddRegra (numPorta, tempIpIface.GetAddress (0));
+      // Colocando o rate limiter na porta
+      switches.Get (0)->AssignRateLimiter (numPorta, rl);
+    }
   //Slice 1 - Grupo 1
-  for (size_t i = 0; i < hostG1S1.GetN(); i++){
-    // Conectando hosts com o switch.
-    NetDeviceContainer link = csmaHelper.Install (switchNode, hostG1S1.Get (i));
-    uint32_t numPorta = switches.Get(0)->AddSwitchPort (link.Get (0))->GetPortNo ();
-    switchPorts.Add(link.Get(0));
-    hostG1S1Devices.Add (link.Get (1));
-    // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
-    Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
-    IpG1S1.Add (tempIpIface);
-    controllerSlice1->AddRegra (numPorta, tempIpIface.GetAddress (0));
-  }
+  for (size_t i = 0; i < hostG1S1.GetN (); i++)
+    {
+      // Conectando hosts com o switch.
+      NetDeviceContainer link = csmaHelper.Install (switchNode, hostG1S1.Get (i));
+      uint32_t numPorta = switches.Get (0)->AddSwitchPort (link.Get (0))->GetPortNo ();
+      switchPorts.Add (link.Get (0));
+      hostG1S1Devices.Add (link.Get (1));
+      // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
+      Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
+      IpG1S1.Add (tempIpIface);
+      controllerSlice1->AddRegra (numPorta, tempIpIface.GetAddress (0));
+      // Colocando o rate limiter na porta
+      switches.Get (0)->AssignRateLimiter (numPorta, rl);
+    }
   //Slice 2 - Grupo 0
   ipv4helpr.SetBase ("10.2.0.0", "255.255.0.0");
-  for (size_t i = 0; i < hostG0S2.GetN(); i++){
-    // Conectando hosts com o switch.
-    NetDeviceContainer link = csmaHelper.Install (switchNode, hostG0S2.Get (i));
-    uint32_t numPorta = switches.Get(0)->AddSwitchPort (link.Get (0))->GetPortNo ();
-    switchPorts.Add(link.Get(0));
-    hostG0S2Devices.Add (link.Get (1));
-    // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
-    Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
-    IpG0S2.Add (tempIpIface);
-    controllerSlice2->AddRegra (numPorta, tempIpIface.GetAddress (0));
-  }
+  for (size_t i = 0; i < hostG0S2.GetN (); i++)
+    {
+      // Conectando hosts com o switch.
+      NetDeviceContainer link = csmaHelper.Install (switchNode, hostG0S2.Get (i));
+      uint32_t numPorta = switches.Get (0)->AddSwitchPort (link.Get (0))->GetPortNo ();
+      switchPorts.Add (link.Get (0));
+      hostG0S2Devices.Add (link.Get (1));
+      // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
+      Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
+      IpG0S2.Add (tempIpIface);
+      controllerSlice2->AddRegra (numPorta, tempIpIface.GetAddress (0));
+      // Colocando o rate limiter na porta
+      switches.Get (0)->AssignRateLimiter (numPorta, rl2);
+    }
   //Slice 2 - Grupo 1
-  for (size_t i = 0; i < hostG1S2.GetN(); i++){
-    // Conectando hosts com o switch.
-    NetDeviceContainer link = csmaHelper.Install (switchNode, hostG1S2.Get (i));
-    uint32_t numPorta = switches.Get(0)->AddSwitchPort (link.Get (0))->GetPortNo ();
-    switchPorts.Add(link.Get(0));
-    hostG1S2Devices.Add (link.Get (1));
-    // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
-    Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
-    IpG1S2.Add (tempIpIface);
-    controllerSlice2->AddRegra (numPorta, tempIpIface.GetAddress (0));
-  }
-    
+  for (size_t i = 0; i < hostG1S2.GetN (); i++)
+    {
+      // Conectando hosts com o switch.
+      NetDeviceContainer link = csmaHelper.Install (switchNode, hostG1S2.Get (i));
+      uint32_t numPorta = switches.Get (0)->AddSwitchPort (link.Get (0))->GetPortNo ();
+      switchPorts.Add (link.Get (0));
+      hostG1S2Devices.Add (link.Get (1));
+      // Colocando os ips nos hosts e notificando o controlador para adicionar as regras.
+      Ipv4InterfaceContainer tempIpIface = ipv4helpr.Assign (link.Get (1));
+      IpG1S2.Add (tempIpIface);
+      controllerSlice2->AddRegra (numPorta, tempIpIface.GetAddress (0));
+      // Colocando o rate limiter na porta
+      switches.Get (0)->AssignRateLimiter (numPorta, rl2);
+    }
+
   //Separando os slices em suas tabelas
-  uint64_t datap = switches.Get(0)->GetDatapathId();
-  Simulator::Schedule (Seconds(0.5), &regraZero, controller1, datap, hostsSlice1, hostsSlice2);
+  uint64_t datap = switches.Get (0)->GetDatapathId ();
+  Simulator::Schedule (Seconds (0.5), &regraZero, controller1, datap, hostsSlice1, hostsSlice2);
 
   //Aplicacoes http
   //Group 0 = Clientes; Group 1 = Servidores
@@ -250,65 +275,69 @@ main (int argc, char *argv[])
   x->SetAttribute ("Max", DoubleValue (10));
   /* Todos os nós com aplicação de cliente e servidor */
   //Slice 1 - Grupo 0
-  for (size_t i = 0; i < hostG0S1.GetN(); i++){
-    //App Server
-    HttpServerHelper httpServer (httpServerPort);
-    ApplicationContainer httpServerApps;
-    httpServerApps.Add (httpServer.Install (hostG0S1.Get (i)));
-    httpServerApps.Start (Seconds(2));
-    httpServerApps.Stop (Seconds(stop));
-    //App Cliente
-    ApplicationContainer httpClientApps;
-    HttpClientHelper httpClient (IpG1S1.GetAddress (i), httpServerPort);
-    httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
-    httpClientApps.Start (Seconds(x->GetValue()));
-    httpClientApps.Stop (Seconds(stop));
-  }
+  for (size_t i = 0; i < hostG0S1.GetN (); i++)
+    {
+      //App Server
+      HttpServerHelper httpServer (httpServerPort);
+      ApplicationContainer httpServerApps;
+      httpServerApps.Add (httpServer.Install (hostG0S1.Get (i)));
+      httpServerApps.Start (Seconds (2));
+      httpServerApps.Stop (Seconds (stop));
+      //App Cliente
+      ApplicationContainer httpClientApps;
+      HttpClientHelper httpClient (IpG1S1.GetAddress (i), httpServerPort);
+      httpClientApps.Add (httpClient.Install (hostG0S1.Get (i)));
+      httpClientApps.Start (Seconds (x->GetValue ()));
+      httpClientApps.Stop (Seconds (stop));
+    }
   //Slice 1 - Grupo 1
-  for (size_t i = 0; i < hostG1S1.GetN(); i++){
-    //App Server
-    HttpServerHelper httpServer (httpServerPort);
-    ApplicationContainer httpServerApps;
-    httpServerApps.Add (httpServer.Install (hostG1S1.Get (i)));
-    httpServerApps.Start (Seconds(2));
-    httpServerApps.Stop (Seconds(stop));
-    //App Cliente
-    ApplicationContainer httpClientApps;
-    HttpClientHelper httpClient (IpG0S1.GetAddress (i), httpServerPort);
-    httpClientApps.Add (httpClient.Install (hostG1S1.Get (i)));
-    httpClientApps.Start (Seconds(x->GetValue()));
-    httpClientApps.Stop (Seconds(stop));
-  }
+  for (size_t i = 0; i < hostG1S1.GetN (); i++)
+    {
+      //App Server
+      HttpServerHelper httpServer (httpServerPort);
+      ApplicationContainer httpServerApps;
+      httpServerApps.Add (httpServer.Install (hostG1S1.Get (i)));
+      httpServerApps.Start (Seconds (2));
+      httpServerApps.Stop (Seconds (stop));
+      //App Cliente
+      ApplicationContainer httpClientApps;
+      HttpClientHelper httpClient (IpG0S1.GetAddress (i), httpServerPort);
+      httpClientApps.Add (httpClient.Install (hostG1S1.Get (i)));
+      httpClientApps.Start (Seconds (x->GetValue ()));
+      httpClientApps.Stop (Seconds (stop));
+    }
   //Slice 2 - Grupo 0
-  for (size_t i = 0; i < hostG0S2.GetN(); i++){
-    //App Server
-    HttpServerHelper httpServer (httpServerPort);
-    ApplicationContainer httpServerApps;
-    httpServerApps.Add (httpServer.Install (hostG0S2.Get (i)));
-    httpServerApps.Start (Seconds(2));
-    httpServerApps.Stop (Seconds(stop));
-    //App Cliente
-    ApplicationContainer httpClientApps;
-    HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
-    httpClientApps.Add (httpClient.Install (hostG0S2.Get (i)));
-    httpClientApps.Start (Seconds(x->GetValue()));
-    httpClientApps.Stop (Seconds(stop));
-  }
+  for (size_t i = 0; i < hostG0S2.GetN (); i++)
+    {
+      //App Server
+      HttpServerHelper httpServer (httpServerPort);
+      ApplicationContainer httpServerApps;
+      httpServerApps.Add (httpServer.Install (hostG0S2.Get (i)));
+      httpServerApps.Start (Seconds (2));
+      httpServerApps.Stop (Seconds (stop));
+      //App Cliente
+      ApplicationContainer httpClientApps;
+      HttpClientHelper httpClient (IpG1S2.GetAddress (i), httpServerPort);
+      httpClientApps.Add (httpClient.Install (hostG0S2.Get (i)));
+      httpClientApps.Start (Seconds (x->GetValue ()));
+      httpClientApps.Stop (Seconds (stop));
+    }
   //Slice 2 - Grupo 1
-  for (size_t i = 0; i < hostG1S2.GetN(); i++){
-    //App Server
-    HttpServerHelper httpServer (httpServerPort);
-    ApplicationContainer httpServerApps;
-    httpServerApps.Add (httpServer.Install (hostG1S2.Get (i)));
-    httpServerApps.Start (Seconds(2));
-    httpServerApps.Stop (Seconds(stop));
-    //App Cliente
-    ApplicationContainer httpClientApps;
-    HttpClientHelper httpClient (IpG0S2.GetAddress (i), httpServerPort);
-    httpClientApps.Add (httpClient.Install (hostG1S2.Get (i)));
-    httpClientApps.Start (Seconds(x->GetValue()));
-    httpClientApps.Stop (Seconds(stop));
-  }
+  for (size_t i = 0; i < hostG1S2.GetN (); i++)
+    {
+      //App Server
+      HttpServerHelper httpServer (httpServerPort);
+      ApplicationContainer httpServerApps;
+      httpServerApps.Add (httpServer.Install (hostG1S2.Get (i)));
+      httpServerApps.Start (Seconds (2));
+      httpServerApps.Stop (Seconds (stop));
+      //App Cliente
+      ApplicationContainer httpClientApps;
+      HttpClientHelper httpClient (IpG0S2.GetAddress (i), httpServerPort);
+      httpClientApps.Add (httpClient.Install (hostG1S2.Get (i)));
+      httpClientApps.Start (Seconds (x->GetValue ()));
+      httpClientApps.Stop (Seconds (stop));
+    }
 
   of13Helper->CreateOpenFlowChannels ();
   Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
@@ -318,11 +347,12 @@ main (int argc, char *argv[])
   //Simulator::Schedule (Seconds(9.9), &OFSwitch13Device::PrintFlowTables, switches.Get(0));
 
   // Enable datapath stats and pcap traces at hosts, switch(es), and controller(s)
-  if (trace){
-      of13Helper->EnableDatapathStats ("switch-stats"+ std::to_string(hostsSlice1) + "_" + std::to_string(hostsSlice2));
+  if (trace)
+    {
+      of13Helper->EnableDatapathStats ("switch-stats" + std::to_string (hostsSlice1) + "_" + std::to_string (hostsSlice2) + "_rng" + std::to_string (RngSeedManager::GetRun ()));
       //LogComponentEnable ("FlowMonitor", LOG_PREFIX_TIME);
       //LogComponentEnable ("FlowMonitor", LOG_LEVEL_ALL);
-  }
+    }
   if (pcap)
     {
       of13Helper->EnableOpenFlowPcap ("openflow");
@@ -336,9 +366,9 @@ main (int argc, char *argv[])
   //Flowmonitor
   FlowMonitorHelper flowHelper;
   Ptr<FlowMonitor> monitor1;
-  monitor1 = flowHelper.Install(NodeContainer (hostG0S1,hostG1S1,hostG0S2,hostG1S2));
-  monitor1->Start(Seconds(100));
-  monitor1->Stop(Seconds(590));
+  monitor1 = flowHelper.Install (NodeContainer (hostG0S1,hostG1S1,hostG0S2,hostG1S2));
+  monitor1->Start (Seconds (100));
+  monitor1->Stop (Seconds (590));
 
   // Run the simulation
   std::cout << "Numero de hosts slice 1: " << hostsSlice1 << std::endl;
@@ -346,8 +376,8 @@ main (int argc, char *argv[])
   std::cout << "Tempo de simulacao: " << simTime << std::endl;
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
-  monitor1->SerializeToXmlFile("flowmonitor" + std::to_string(hostsSlice1) + "_" + std::to_string(hostsSlice2) + ".xml", true, true);
+  monitor1->SerializeToXmlFile ("flowmonitor" + std::to_string (hostsSlice1) + "_" + std::to_string (hostsSlice2) + "_rng" +  std::to_string (RngSeedManager::GetRun ()) + ".xml", true, true);
   Simulator::Destroy ();
-  relogioFinal = clock();
-  std::cout << "Tempo real gasto: " << (1000.0 * (relogioFinal-relogioInicio) / CLOCKS_PER_SEC)/1000.0 << " segundos"<< std::endl;
+  relogioFinal = clock ();
+  std::cout << "Tempo real gasto: " << (1000.0 * (relogioFinal - relogioInicio) / CLOCKS_PER_SEC) / 1000.0 << " segundos" << std::endl;
 }
