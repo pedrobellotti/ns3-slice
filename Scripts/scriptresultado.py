@@ -227,10 +227,11 @@ def main(argv):
                 TxpacSlice2 += flow.txPackets
                 RxpacSlice2 += flow.rxPackets
     
-    numHosts = argv[2]
-    rng = argv[3]
-    aux = open("resultados.txt","a+")
-    aux.write("%s-%s\t\t%s\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f" % (numHosts,numHosts,rng,TxpacSlice1,RxpacSlice1,dropSlice1,TxpacSlice2,RxpacSlice2,dropSlice2))
+    numHostsS1 = argv[2]
+    numHostsS2 = argv[3]
+    rng = argv[4]
+    aux = open("resultados_iguais.txt","a+")
+    aux.write("%s-%s\t\t%s\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f\t\t%.0f" % (numHostsS1,numHostsS2,rng,TxpacSlice1,RxpacSlice1,dropSlice1,TxpacSlice2,RxpacSlice2,dropSlice2))
     aux.write("\n")
     aux.close()
 
