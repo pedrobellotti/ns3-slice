@@ -1,6 +1,6 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2014 University of Campinas (Unicamp)
+ * Copyright (c) 2019 Federal University of Juiz de Fora (UFJF)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -35,6 +35,8 @@
  * Host group 0 -> Server group 0
  * Host group 1 -> Server group 1
  *
+ * Author: Pedro Bellotti <pedro.bellotti@ice.ufjf.br>
+ * Author: João Victor Guimarães <joaoguimaraes@ice.ufjf.br>
  */
 
 #include <ns3/core-module.h>
@@ -188,13 +190,14 @@ main (int argc, char *argv[])
   OFSwitch13DeviceContainer switches = of13Helper->InstallSwitch (switchNode);
 
   // Configurando um token bucket para cada slice
-  Config::SetDefault ("ns3::TokenBucket::Size", UintegerValue (50000000));
+  Config::SetDefault ("ns3::TokenBucket::Size", UintegerValue (100000000));
   Config::SetDefault ("ns3::TokenBucket::TimeoutInterval", TimeValue (MilliSeconds (50)));
-  Config::SetDefault ("ns3::TokenBucket::Rate", StringValue ("50Mbps"));
+  Config::SetDefault ("ns3::TokenBucket::Rate", StringValue ("80Mbps"));
   // Rate limiter slice 1
   uint32_t rl = switches.Get (0)->CreateRateLimiter ();
 
   // Rate limiter slice 2
+  Config::SetDefault ("ns3::TokenBucket::Rate", StringValue ("20Mbps"));
   uint32_t rl2 = switches.Get (0)->CreateRateLimiter ();
 
   /* Dividindo os dois grupos de Hosts de cada slice */

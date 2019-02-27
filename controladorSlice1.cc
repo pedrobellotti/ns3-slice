@@ -1,6 +1,6 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2016 University of Campinas (Unicamp)
+ * Copyright (c) 2019 Federal University of Juiz de Fora (UFJF)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,7 +15,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- * Author:  Luciano Chaves <luciano@lrc.ic.unicamp.br>
+ * Author: Pedro Bellotti <pedro.bellotti@ice.ufjf.br>
+ * Author: João Victor Guimarães <joaoguimaraes@ice.ufjf.br>
  */
 
 #include "controladorSlice1.h"
@@ -47,7 +48,7 @@ ControladorSlice1::AddRegra (uint32_t portNo, Ipv4Address ipAddr)
 {
   NS_LOG_FUNCTION (this << portNo << ipAddr);
 
-  // Inserindo na tabela 2 a regra que mapeia IP de destino na porta de saída.
+  // Inserindo na tabela 1 a regra que mapeia IP de destino na porta de saída.
   std::ostringstream cmd;
   cmd << "flow-mod cmd=add,prio=64,table=1"
       << " eth_type=0x800,ip_dst=" << ipAddr
