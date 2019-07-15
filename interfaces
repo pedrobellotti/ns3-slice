@@ -1,0 +1,24 @@
+# interfaces(5) file used by ifup(8) and ifdown(8)
+auto lo
+iface lo inet loopback
+
+allow-hotplug enp2s0
+iface enp2s0 inet dhcp
+
+allow-hotplug enp1s0
+iface enp1s0 inet static
+	address 10.0.0.10
+	netmask 255.255.255.0
+	post-up ip route add 10.0.0.0/24 dev enp1s0 src 10.0.0.10 table rt2 
+	post-up ip route add default via 10.0.0.1 dev enp1s0 table rt2
+	post-up ip rule add from 10.0.0.10/32 table rt2
+	post-up ip rule add to 10.0.0.10/32 table rt2
+
+allow-hotplug enp1s1
+iface enp1s1 inet static
+	address 10.0.0.11
+	netmask 255.255.255.0
+	post-up ip route add 10.0.0.0/24 dev enp1s1 src 10.0.0.11 table rt2 
+	post-up ip route add default via 10.0.0.1 dev enp1s1 table rt2
+	post-up ip rule add from 10.0.0.11/32 table rt2
+	post-up ip rule add to 10.0.0.11/32 table rt2
